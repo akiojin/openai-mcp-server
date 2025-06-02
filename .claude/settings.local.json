@@ -6,7 +6,10 @@
       "Bash(mkdir:*)",
       "Bash(npm install)",
       "Bash(npm run build:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run format:*)",
+      "Bash(mv:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
