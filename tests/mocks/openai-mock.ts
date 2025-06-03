@@ -88,7 +88,7 @@ export class MockOpenAIClient implements IOpenAIClient {
       id: 'chatcmpl-test123',
       object: 'chat.completion',
       created: Date.now(),
-      model: 'gpt-4o',
+      model: 'gpt-4.1',
       choices: [
         {
           index: 0,
@@ -115,21 +115,51 @@ export class MockOpenAIClient implements IOpenAIClient {
       object: 'list',
       data: [
         {
+          id: 'gpt-4.1',
+          object: 'model',
+          created: 1735862400,
+          owned_by: 'openai',
+        },
+        {
+          id: 'gpt-4.1-mini',
+          object: 'model',
+          created: 1735862400,
+          owned_by: 'openai',
+        },
+        {
+          id: 'gpt-4.1-nano',
+          object: 'model',
+          created: 1735862400,
+          owned_by: 'openai',
+        },
+        {
           id: 'gpt-4o',
           object: 'model',
-          created: 1678953629,
+          created: 1715731200,
           owned_by: 'openai',
         },
         {
-          id: 'gpt-4',
+          id: 'o1',
           object: 'model',
-          created: 1678953629,
+          created: 1726185600,
           owned_by: 'openai',
         },
         {
-          id: 'gpt-3.5-turbo',
+          id: 'o1-pro',
           object: 'model',
-          created: 1678953629,
+          created: 1733433600,
+          owned_by: 'openai',
+        },
+        {
+          id: 'o3',
+          object: 'model',
+          created: 1744569600,
+          owned_by: 'openai',
+        },
+        {
+          id: 'o4-mini',
+          object: 'model',
+          created: 1744569600,
           owned_by: 'openai',
         },
       ],

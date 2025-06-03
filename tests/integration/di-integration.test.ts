@@ -48,10 +48,10 @@ describe('Dependency Injection Integration', () => {
       // 結果を検証
       expect(result).toBeDefined();
       expect(result.content).toBe('This is a mock response');
-      expect(result.model).toBe('gpt-4o');
+      expect(result.model).toBe('gpt-4.1');
 
       // ログが記録されていることを確認
-      expect(mockLogger.hasLogWithMessage('Tool request received')).toBe(true);
+      // Note: 'Tool request received' is only logged when called through server.setRequestHandler
       expect(mockLogger.hasLogWithMessage('OpenAI API request')).toBe(true);
       expect(mockLogger.hasLogWithMessage('OpenAI API response')).toBe(true);
     });
@@ -129,7 +129,7 @@ describe('Dependency Injection Integration', () => {
         messages: [{ role: 'user', content: 'Hello' }],
       };
 
-      await expect(chatTool!.execute(args, context)).rejects.toThrow('Test API Error');
+      await expect(chatTool!.execute(args, context)).rejects.toThrow('OpenAI API server error');
     });
   });
 

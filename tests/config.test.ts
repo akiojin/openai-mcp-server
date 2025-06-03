@@ -35,7 +35,7 @@ describe('Config Management', () => {
       const loggingConfig = config.get('logging');
       
       expect(serverConfig.name).toBe('openai-mcp-server');
-      expect(openaiConfig.defaultModel).toBe('gpt-4o');
+      expect(openaiConfig.defaultModel).toBe('gpt-4.1');
       expect(openaiConfig.defaultTemperature).toBe(0.7);
       expect(openaiConfig.defaultMaxTokens).toBe(1000);
       expect(loggingConfig.level).toBe('info');
@@ -59,11 +59,18 @@ describe('Config Management', () => {
   });
 
   describe('Environment Variable Overrides', () => {
+    beforeEach(async () => {
+      // Reset the ConfigManager instance before each test
+      jest.resetModules();
+      const configModule = await import('../src/config');
+      configModule.ConfigManager.instance = null;
+    });
+
     it('should override default model from environment', async () => {
       process.env.OPENAI_DEFAULT_MODEL = 'gpt-3.5-turbo';
       
       // Clear module cache to get fresh config
-      delete require.cache[require.resolve('../src/config')];
+      jest.resetModules();
       const { config } = await import('../src/config');
       
       const openaiConfig = config.get('openai');
@@ -73,7 +80,7 @@ describe('Config Management', () => {
     it('should override temperature from environment', async () => {
       process.env.OPENAI_DEFAULT_TEMPERATURE = '0.5';
       
-      delete require.cache[require.resolve('../src/config')];
+      jest.resetModules();
       const { config } = await import('../src/config');
       
       const openaiConfig = config.get('openai');
@@ -83,7 +90,7 @@ describe('Config Management', () => {
     it('should override log level from environment', async () => {
       process.env.LOG_LEVEL = 'debug';
       
-      delete require.cache[require.resolve('../src/config')];
+      jest.resetModules();
       const { config } = await import('../src/config');
       
       const loggingConfig = config.get('logging');
@@ -94,12 +101,12 @@ describe('Config Management', () => {
       process.env.OPENAI_DEFAULT_TEMPERATURE = 'invalid';
       process.env.OPENAI_DEFAULT_MAX_TOKENS = 'also-invalid';
       
-      delete require.cache[require.resolve('../src/config')];
+      jest.resetModules();
       const { config } = await import('../src/config');
       
       const openaiConfig = config.get('openai');
-      expect(openaiConfig.defaultTemperature).toBe(0.7); // Default value
-      expect(openaiConfig.defaultMaxTokens).toBe(1000); // Default value
+      expect(openaiConfig.defaultTemperature).toBe(0.7); // Default value from config.json
+      expect(openaiConfig.defaultMaxTokens).toBe(1000); // Default value from config.json
     });
   });
 

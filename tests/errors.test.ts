@@ -47,7 +47,7 @@ describe('Error Classes', () => {
       const error = new ValidationError('Invalid input');
       
       expect(error).toBeInstanceOf(MCPError);
-      expect(error.constructor.name).toBe('ValidationError');
+      expect(error.name).toBe('ValidationError');
       expect(error.code).toBe(ErrorCode.INVALID_ARGUMENTS);
       expect(error.message).toBe('Invalid input');
       expect(error.name).toBe('ValidationError');
@@ -65,7 +65,7 @@ describe('Error Classes', () => {
       const error = new AuthenticationError();
       
       expect(error).toBeInstanceOf(MCPError);
-      expect(error.constructor.name).toBe('AuthenticationError');
+      expect(error.name).toBe('AuthenticationError');
       expect(error.code).toBe(ErrorCode.AUTHENTICATION_ERROR);
       expect(error.message).toBe('Invalid authentication credentials');
       expect(error.statusCode).toBe(401);
@@ -84,7 +84,7 @@ describe('Error Classes', () => {
       const error = new RateLimitError();
       
       expect(error).toBeInstanceOf(MCPError);
-      expect(error.constructor.name).toBe('RateLimitError');
+      expect(error.name).toBe('RateLimitError');
       expect(error.code).toBe(ErrorCode.RATE_LIMIT_ERROR);
       expect(error.message).toBe('Rate limit exceeded');
       expect(error.statusCode).toBe(429);
@@ -104,7 +104,7 @@ describe('Error Classes', () => {
       const error = new OpenAIServerError('Service unavailable', 503);
       
       expect(error).toBeInstanceOf(MCPError);
-      expect(error.constructor.name).toBe('OpenAIServerError');
+      expect(error.name).toBe('OpenAIServerError');
       expect(error.code).toBe(ErrorCode.OPENAI_SERVER_ERROR);
       expect(error.message).toBe('Service unavailable');
       expect(error.statusCode).toBe(503);

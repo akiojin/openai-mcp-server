@@ -77,8 +77,11 @@ describe('InMemoryCache', () => {
 
   describe('LRU eviction', () => {
     it('should evict least recently used entry when max size reached', async () => {
+      // 異なるタイムスタンプを保証するため、少し遅延を入れる
       await cache.set('key1', 'value1');
+      await new Promise(resolve => setTimeout(resolve, 10));
       await cache.set('key2', 'value2');
+      await new Promise(resolve => setTimeout(resolve, 10));
       await cache.set('key3', 'value3');
       
       // Cache is now full (maxSize = 3)
@@ -90,10 +93,17 @@ describe('InMemoryCache', () => {
       // Add new entry, should evict key2 (least recently used)
       await cache.set('key4', 'value4');
       
-      expect(await cache.has('key1')).toBe(true);  // Recently accessed
-      expect(await cache.has('key2')).toBe(false); // Should be evicted
-      expect(await cache.has('key3')).toBe(true);  // Still present
-      expect(await cache.has('key4')).toBe(true);  // Newly added
+      // デバッグ用に全キーの存在を確認
+      const key1Exists = await cache.has('key1');
+      const key2Exists = await cache.has('key2');
+      const key3Exists = await cache.has('key3');
+      const key4Exists = await cache.has('key4');
+      
+      // LRUの動作を確認：key2が削除されるはず（最も古くアクセスされた）
+      expect(key1Exists).toBe(true);  // Recently accessed
+      expect(key2Exists).toBe(false); // Should be evicted (LRU)
+      expect(key3Exists).toBe(true);  // Still present
+      expect(key4Exists).toBe(true);  // Newly added
     });
   });
 

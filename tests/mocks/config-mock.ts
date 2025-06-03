@@ -44,7 +44,7 @@ export class MockConfigManager implements IConfigManager {
         description: 'Test OpenAI API MCP Server',
       },
       openai: {
-        defaultModel: 'gpt-4o',
+        defaultModel: 'gpt-4.1',
         defaultTemperature: 0.7,
         defaultMaxTokens: 1000,
         timeout: 30000,

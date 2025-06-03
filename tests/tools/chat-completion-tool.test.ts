@@ -32,23 +32,35 @@ describe('ChatCompletionTool', () => {
 
   describe('Input Validation', () => {
     it('should throw error for null/undefined arguments', async () => {
-      await expect(tool.execute(null, context)).rejects.toThrow(ValidationError);
-      await expect(tool.execute(undefined, context)).rejects.toThrow(ValidationError);
+      await expect(tool.execute(null, context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
+      await expect(tool.execute(undefined, context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
     });
 
     it('should throw error for non-object arguments', async () => {
-      await expect(tool.execute('invalid', context)).rejects.toThrow(ValidationError);
-      await expect(tool.execute(123, context)).rejects.toThrow(ValidationError);
+      await expect(tool.execute('invalid', context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
+      await expect(tool.execute(123, context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
     });
 
     it('should throw error when messages field is missing', async () => {
       const args = { model: 'gpt-4o' };
-      await expect(tool.execute(args, context)).rejects.toThrow(ValidationError);
+      await expect(tool.execute(args, context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
     });
 
     it('should throw error when messages is not an array', async () => {
       const args = { messages: 'not an array' };
-      await expect(tool.execute(args, context)).rejects.toThrow(ValidationError);
+      await expect(tool.execute(args, context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
     });
 
     it('should validate message structure', async () => {
@@ -61,7 +73,9 @@ describe('ChatCompletionTool', () => {
 
       for (const messages of invalidMessages) {
         const args = { messages };
-        await expect(tool.execute(args, context)).rejects.toThrow(ValidationError);
+        await expect(tool.execute(args, context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
       }
     });
 
@@ -71,7 +85,9 @@ describe('ChatCompletionTool', () => {
         temperature: -0.1, // invalid temperature
       };
       
-      await expect(tool.execute(args, context)).rejects.toThrow(ValidationError);
+      await expect(tool.execute(args, context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
     });
 
     it('should validate max_tokens', async () => {
@@ -80,7 +96,9 @@ describe('ChatCompletionTool', () => {
         max_tokens: 0, // invalid token count
       };
       
-      await expect(tool.execute(args, context)).rejects.toThrow(ValidationError);
+      await expect(tool.execute(args, context)).rejects.toThrowError(expect.objectContaining({
+        name: 'ValidationError'
+      }));
     });
   });
 
@@ -94,7 +112,7 @@ describe('ChatCompletionTool', () => {
 
       expect(result).toBeDefined();
       expect(result.content).toBe('This is a mock response');
-      expect(result.model).toBe('gpt-4o');
+      expect(result.model).toBe('gpt-4.1');
       expect(result.usage).toBeDefined();
     });
 

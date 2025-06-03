@@ -42,10 +42,10 @@ describe('ListModelsTool', () => {
     it('should filter and format models correctly', async () => {
       const result = await tool.execute({}, context);
 
-      // すべてのモデルがGPTモデルまたはo1モデルであることを確認
+      // すべてのモデルがGPTモデルまたはo系モデルであることを確認
       result.models.forEach((model: any) => {
         expect(
-          model.id.includes('gpt') || model.id.includes('o1')
+          model.id.includes('gpt') || model.id.includes('o1') || model.id.includes('o3') || model.id.includes('o4')
         ).toBe(true);
       });
 
@@ -64,9 +64,9 @@ describe('ListModelsTool', () => {
       const result = await tool.execute({}, context);
 
       const modelIds = result.models.map((model: any) => model.id);
+      expect(modelIds).toContain('gpt-4.1');
       expect(modelIds).toContain('gpt-4o');
-      expect(modelIds).toContain('gpt-4');
-      expect(modelIds).toContain('gpt-3.5-turbo');
+      expect(modelIds).toContain('o1');
     });
 
     it('should convert timestamps correctly', async () => {
