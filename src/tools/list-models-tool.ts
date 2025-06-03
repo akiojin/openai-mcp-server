@@ -26,7 +26,13 @@ export class ListModelsTool implements IToolHandler {
     const apiDuration = Date.now() - apiStartTime;
 
     const chatModels = modelsResponse.data
-      .filter(model => model.id.includes('gpt') || model.id.includes('o1'))
+      .filter(
+        model =>
+          model.id.includes('gpt') ||
+          model.id.includes('o1') ||
+          model.id.includes('o3') ||
+          model.id.includes('o4')
+      )
       .map(model => ({
         id: model.id,
         created: new Date(model.created * 1000).toISOString(),

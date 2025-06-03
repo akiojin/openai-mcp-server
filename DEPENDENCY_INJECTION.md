@@ -42,7 +42,7 @@ OpenAI MCP サーバーにおいて、テスタビリティと保守性を向上
 
 ## ファイル構成
 
-```
+```text
 src/
 ├── interfaces.ts                     # インターフェース定義
 ├── container/

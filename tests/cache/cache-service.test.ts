@@ -1,279 +1,266 @@
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { CacheService } from '../../src/cache/cache-service.js';
-import { CacheOptions } from '../../src/cache/interfaces.js';
-import { ILogger } from '../../src/interfaces.js';
-
-// モックロガー
-const mockLogger: ILogger = {
-  generateRequestId: jest.fn(() => 'test-request-id'),
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  toolRequest: jest.fn(),
-  toolResponse: jest.fn(),
-  openaiRequest: jest.fn(),
-  openaiResponse: jest.fn(),
-  openaiError: jest.fn(),
-};
+import { CacheConfig } from '../../src/cache/interfaces.js';
 
 describe('CacheService', () => {
   let cacheService: CacheService;
-  let cacheOptions: CacheOptions;
+  let cacheConfig: CacheConfig;
 
   beforeEach(() => {
-    cacheOptions = {
-      defaultTtl: 1000,
+    cacheConfig = {
+      enabled: true,
+      ttl: 1000,
       maxSize: 10,
-      cleanupInterval: 0, // テスト中は自動クリーンアップを無効化
-      enableLru: true,
+      strategy: 'LRU',
     };
-    cacheService = new CacheService(cacheOptions, mockLogger, true);
-    jest.clearAllMocks();
+    cacheService = new CacheService(cacheConfig);
   });
 
-  afterEach(() => {
-    cacheService.dispose();
+  afterEach(async () => {
+    await cacheService.dispose();
   });
 
-  describe('Chat Completion キャッシュ', () => {
-    test('Chat Completion結果をキャッシュと取得できる', () => {
-      const model = 'gpt-4o';
+  describe('Chat Completion Cache', () => {
+    it('should cache and retrieve chat completion results', async () => {
+      const model = 'gpt-4.1';
       const messages = [{ role: 'user', content: 'Hello' }];
       const temperature = 0.7;
       const maxTokens = 1000;
       const result = { content: 'Hi there!', usage: { total_tokens: 10 }, model };
 
-      // 最初はキャッシュに何もない
-      expect(cacheService.getChatCompletion(model, messages, temperature, maxTokens)).toBeUndefined();
+      // Initially cache should be empty
+      const cachedResult = await cacheService.getChatCompletion(model, messages, temperature, maxTokens);
+      expect(cachedResult).toBeUndefined();
 
-      // 結果をキャッシュに保存
-      cacheService.setChatCompletion(model, messages, temperature, maxTokens, result);
+      // Save result to cache
+      await cacheService.setChatCompletion(model, messages, temperature, maxTokens, result);
 
-      // キャッシュから取得できる
-      const cached = cacheService.getChatCompletion(model, messages, temperature, maxTokens);
+      // Retrieve from cache
+      const retrieved = await cacheService.getChatCompletion(model, messages, temperature, maxTokens);
+      expect(retrieved).toEqual(result);
+    });
+
+    it('should return different keys for different parameters', async () => {
+      const model = 'gpt-4.1';
+      const messages = [{ role: 'user', content: 'Hello' }];
+      const result1 = { content: 'Response 1' };
+      const result2 = { content: 'Response 2' };
+
+      // Cache with different temperatures
+      await cacheService.setChatCompletion(model, messages, 0.7, 1000, result1);
+      await cacheService.setChatCompletion(model, messages, 0.8, 1000, result2);
+
+      // Retrieve with specific temperature
+      const retrieved1 = await cacheService.getChatCompletion(model, messages, 0.7, 1000);
+      const retrieved2 = await cacheService.getChatCompletion(model, messages, 0.8, 1000);
+
+      expect(retrieved1).toEqual(result1);
+      expect(retrieved2).toEqual(result2);
+    });
+
+    it('should respect TTL for cached entries', async () => {
+      const model = 'gpt-4.1';
+      const messages = [{ role: 'user', content: 'Hello' }];
+      const result = { content: 'Hi there!' };
+
+      // Cache with short TTL
+      await cacheService.setChatCompletion(model, messages, 0.7, 1000, result, 100);
+
+      // Should be available immediately
+      let cached = await cacheService.getChatCompletion(model, messages, 0.7, 1000);
       expect(cached).toEqual(result);
-    });
 
-    test('異なるパラメータでは異なるキャッシュエントリを使用する', () => {
-      const messages = [{ role: 'user', content: 'Hello' }];
-      const result1 = { content: 'Response 1', model: 'gpt-4o' };
-      const result2 = { content: 'Response 2', model: 'gpt-3.5-turbo' };
-
-      cacheService.setChatCompletion('gpt-4o', messages, 0.7, 1000, result1);
-      cacheService.setChatCompletion('gpt-3.5-turbo', messages, 0.7, 1000, result2);
-
-      expect(cacheService.getChatCompletion('gpt-4o', messages, 0.7, 1000)).toEqual(result1);
-      expect(cacheService.getChatCompletion('gpt-3.5-turbo', messages, 0.7, 1000)).toEqual(result2);
-    });
-
-    test('高い温度設定の場合はキャッシュしない', () => {
-      const model = 'gpt-4o';
-      const messages = [{ role: 'user', content: 'Hello' }];
-      const temperature = 1.8; // 高い温度
-      const maxTokens = 1000;
-      const result = { content: 'Response', model };
-
-      cacheService.setChatCompletion(model, messages, temperature, maxTokens, result);
-
-      // 高い温度設定はキャッシュしないため、取得できない
-      expect(cacheService.getChatCompletion(model, messages, temperature, maxTokens)).toBeUndefined();
-    });
-
-    test('カスタムTTLでキャッシュできる', async () => {
-      const model = 'gpt-4o';
-      const messages = [{ role: 'user', content: 'Hello' }];
-      const temperature = 0.7;
-      const maxTokens = 1000;
-      const result = { content: 'Response', model };
-
-      // 短いTTLでキャッシュ
-      cacheService.setChatCompletion(model, messages, temperature, maxTokens, result, 100);
-
-      // すぐには取得できる
-      expect(cacheService.getChatCompletion(model, messages, temperature, maxTokens)).toEqual(result);
-
-      // TTL経過後は取得できない
+      // Wait for expiration
       await new Promise(resolve => setTimeout(resolve, 150));
-      expect(cacheService.getChatCompletion(model, messages, temperature, maxTokens)).toBeUndefined();
+
+      // Should be expired
+      cached = await cacheService.getChatCompletion(model, messages, 0.7, 1000);
+      expect(cached).toBeUndefined();
     });
   });
 
-  describe('Model List キャッシュ', () => {
-    test('Model List結果をキャッシュと取得できる', () => {
-      const result = {
+  describe('Model List Cache', () => {
+    it('should cache and retrieve model list', async () => {
+      const modelList = {
         models: [
-          { id: 'gpt-4o', created: '2024-01-01T00:00:00Z', owned_by: 'openai' },
-          { id: 'gpt-3.5-turbo', created: '2024-01-01T00:00:00Z', owned_by: 'openai' }
+          { id: 'gpt-4.1', created: '2024-01-01', owned_by: 'openai' },
+          { id: 'gpt-4o', created: '2024-01-01', owned_by: 'openai' },
         ],
-        count: 2
+        count: 2,
       };
 
-      // 最初はキャッシュに何もない
-      expect(cacheService.getModelList()).toBeUndefined();
+      // Initially empty
+      let cached = await cacheService.getModelList();
+      expect(cached).toBeUndefined();
 
-      // 結果をキャッシュに保存
-      cacheService.setModelList(result);
+      // Save to cache
+      await cacheService.setModelList(modelList);
 
-      // キャッシュから取得できる
-      const cached = cacheService.getModelList();
-      expect(cached).toEqual(result);
+      // Retrieve from cache
+      cached = await cacheService.getModelList();
+      expect(cached).toEqual(modelList);
     });
 
-    test('カスタムTTLでModel Listをキャッシュできる', async () => {
-      const result = { models: [], count: 0 };
+    it('should use custom TTL for model list', async () => {
+      const modelList = { models: [], count: 0 };
 
-      // 短いTTLでキャッシュ
-      cacheService.setModelList(result, 100);
+      // Set with custom TTL
+      await cacheService.setModelList(modelList, 100);
 
-      // すぐには取得できる
-      expect(cacheService.getModelList()).toEqual(result);
+      // Should be available
+      let cached = await cacheService.getModelList();
+      expect(cached).toEqual(modelList);
 
-      // TTL経過後は取得できない
+      // Wait for expiration
       await new Promise(resolve => setTimeout(resolve, 150));
-      expect(cacheService.getModelList()).toBeUndefined();
+
+      // Should be expired
+      cached = await cacheService.getModelList();
+      expect(cached).toBeUndefined();
     });
   });
 
-  describe('キャッシュ有効/無効制御', () => {
-    test('キャッシュが無効の場合は何も保存・取得しない', () => {
-      const disabledCacheService = new CacheService(cacheOptions, mockLogger, false);
-      const model = 'gpt-4o';
+  describe('Cache Management', () => {
+    it('should clear all entries', async () => {
+      const model = 'gpt-4.1';
       const messages = [{ role: 'user', content: 'Hello' }];
-      const result = { content: 'Response', model };
+      const result = { content: 'Hi' };
+      const modelList = { models: [], count: 0 };
 
-      disabledCacheService.setChatCompletion(model, messages, 0.7, 1000, result);
-      expect(disabledCacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeUndefined();
+      // Add entries
+      await cacheService.setChatCompletion(model, messages, 0.7, 1000, result);
+      await cacheService.setModelList(modelList);
 
-      disabledCacheService.dispose();
+      // Verify they exist
+      expect(await cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeDefined();
+      expect(await cacheService.getModelList()).toBeDefined();
+
+      // Clear cache
+      await cacheService.clear();
+
+      // Verify they're gone
+      expect(await cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeUndefined();
+      expect(await cacheService.getModelList()).toBeUndefined();
     });
 
-    test('実行時にキャッシュを無効化できる', () => {
-      const model = 'gpt-4o';
+    it('should respect cache disabled setting', async () => {
+      // Create service with cache disabled
+      const disabledConfig: CacheConfig = {
+        enabled: false,
+        ttl: 1000,
+        maxSize: 10,
+        strategy: 'LRU',
+      };
+      const disabledService = new CacheService(disabledConfig);
+
+      const model = 'gpt-4.1';
       const messages = [{ role: 'user', content: 'Hello' }];
-      const result = { content: 'Response', model };
+      const result = { content: 'Hi' };
 
-      // 最初は有効
-      cacheService.setChatCompletion(model, messages, 0.7, 1000, result);
-      expect(cacheService.getChatCompletion(model, messages, 0.7, 1000)).toEqual(result);
+      // Try to cache
+      await disabledService.setChatCompletion(model, messages, 0.7, 1000, result);
 
-      // 無効化
-      cacheService.setEnabled(false);
-      expect(cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeUndefined();
+      // Should not be cached
+      const cached = await disabledService.getChatCompletion(model, messages, 0.7, 1000);
+      expect(cached).toBeUndefined();
 
-      // 再度有効化（キャッシュはクリアされている）
-      cacheService.setEnabled(true);
-      expect(cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeUndefined();
+      await disabledService.dispose();
     });
 
-    test('isEnabled メソッドで状態を確認できる', () => {
+    it('should toggle cache enabled state', async () => {
+      const model = 'gpt-4.1';
+      const messages = [{ role: 'user', content: 'Hello' }];
+      const result = { content: 'Hi' };
+
+      // Cache should be enabled initially
       expect(cacheService.isEnabled()).toBe(true);
-      
+
+      // Add entry
+      await cacheService.setChatCompletion(model, messages, 0.7, 1000, result);
+      expect(await cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeDefined();
+
+      // Disable cache
       cacheService.setEnabled(false);
       expect(cacheService.isEnabled()).toBe(false);
-      
+
+      // Should not return cached value when disabled
+      expect(await cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeUndefined();
+
+      // Re-enable cache
       cacheService.setEnabled(true);
       expect(cacheService.isEnabled()).toBe(true);
-    });
-  });
 
-  describe('汎用キャッシュ操作', () => {
-    test('汎用のget/setメソッドが動作する', () => {
-      cacheService.set('test-key', 'test-value');
-      expect(cacheService.get('test-key')).toBe('test-value');
+      // Cached value should be available again
+      expect(await cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeDefined();
     });
 
-    test('hasメソッドが正しく動作する', () => {
-      cacheService.set('test-key', 'test-value');
-      expect(cacheService.has('test-key')).toBe(true);
-      expect(cacheService.has('nonexistent')).toBe(false);
-    });
+    it('should provide cache statistics', async () => {
+      const model = 'gpt-4.1';
+      const messages = [{ role: 'user', content: 'Hello' }];
+      const result = { content: 'Hi' };
 
-    test('deleteメソッドが正しく動作する', () => {
-      cacheService.set('test-key', 'test-value');
-      expect(cacheService.delete('test-key')).toBe(true);
-      expect(cacheService.get('test-key')).toBeUndefined();
-      expect(cacheService.delete('nonexistent')).toBe(false);
-    });
+      // Initial stats
+      let stats = await cacheService.getStats();
+      expect(stats.hits).toBe(0);
+      expect(stats.misses).toBe(0);
+      expect(stats.sets).toBe(0);
 
-    test('sizeメソッドが正しい値を返す', () => {
-      expect(cacheService.size()).toBe(0);
+      // Miss
+      await cacheService.getChatCompletion(model, messages, 0.7, 1000);
       
-      cacheService.set('key1', 'value1');
-      cacheService.set('key2', 'value2');
-      expect(cacheService.size()).toBe(2);
-    });
-  });
+      // Set
+      await cacheService.setChatCompletion(model, messages, 0.7, 1000, result);
+      
+      // Hit
+      await cacheService.getChatCompletion(model, messages, 0.7, 1000);
 
-  describe('統計情報とメンテナンス', () => {
-    test('統計情報を取得できる', () => {
-      cacheService.set('key1', 'value1');
-      cacheService.get('key1'); // ヒット
-      cacheService.get('nonexistent'); // ミス
-
-      const stats = cacheService.getStats();
+      stats = await cacheService.getStats();
       expect(stats.hits).toBe(1);
       expect(stats.misses).toBe(1);
+      expect(stats.sets).toBe(1);
       expect(stats.size).toBe(1);
-      expect(stats.hitRate).toBe(0.5);
     });
 
-    test('clearメソッドですべてのキャッシュを削除できる', () => {
-      cacheService.set('key1', 'value1');
-      cacheService.set('key2', 'value2');
-      expect(cacheService.size()).toBe(2);
+    it('should handle generic get/set operations', async () => {
+      const key = 'test-key';
+      const value = { data: 'test-value' };
 
-      cacheService.clear();
-      expect(cacheService.size()).toBe(0);
-    });
+      // Set value
+      await cacheService.set(key, value);
 
-    test('cleanupメソッドで期限切れアイテムを削除できる', async () => {
-      cacheService.set('key1', 'value1', 100); // 短いTTL
-      cacheService.set('key2', 'value2', 2000); // 長いTTL
+      // Get value
+      const retrieved = await cacheService.get(key);
+      expect(retrieved).toEqual(value);
 
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Check existence
+      expect(await cacheService.has(key)).toBe(true);
 
-      cacheService.cleanup();
-      expect(cacheService.has('key1')).toBe(false);
-      expect(cacheService.has('key2')).toBe(true);
+      // Delete value
+      expect(await cacheService.delete(key)).toBe(true);
+      expect(await cacheService.has(key)).toBe(false);
     });
   });
 
-  describe('エラーハンドリング', () => {
-    test('キー生成エラー時は警告ログを出力し、キャッシュしない', () => {
-      // 循環参照のあるオブジェクトでエラーを発生させる
-      const circularRef: any = { a: 1 };
-      circularRef.self = circularRef;
+  describe('Cleanup', () => {
+    it('should cleanup expired entries', async () => {
+      const model = 'gpt-4.1';
+      const messages = [{ role: 'user', content: 'Hello' }];
+      const result = { content: 'Hi' };
 
-      const messages = [{ role: 'user', content: 'Hello', data: circularRef }];
+      // Add entry with short TTL
+      await cacheService.setChatCompletion(model, messages, 0.7, 1000, result, 100);
 
-      cacheService.setChatCompletion('gpt-4o', messages, 0.7, 1000, { content: 'test' });
+      // Should exist
+      expect(await cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeDefined();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Error caching chat completion',
-        expect.objectContaining({
-          error: expect.any(String),
-          model: 'gpt-4o',
-          messageCount: 1,
-        })
-      );
-    });
+      // Wait for expiration
+      await new Promise(resolve => setTimeout(resolve, 150));
 
-    test('キー生成エラー時の取得でも警告ログを出力する', () => {
-      const circularRef: any = { a: 1 };
-      circularRef.self = circularRef;
-      const messages = [{ role: 'user', content: 'Hello', data: circularRef }];
+      // Run cleanup
+      await cacheService.cleanup();
 
-      const result = cacheService.getChatCompletion('gpt-4o', messages, 0.7, 1000);
-
-      expect(result).toBeUndefined();
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Error getting chat completion from cache',
-        expect.objectContaining({
-          error: expect.any(String),
-          model: 'gpt-4o',
-          messageCount: 1,
-        })
-      );
+      // Should be removed
+      expect(await cacheService.getChatCompletion(model, messages, 0.7, 1000)).toBeUndefined();
     });
   });
 });

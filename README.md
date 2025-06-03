@@ -1,12 +1,15 @@
 # OpenAI MCP Server
 
-A Model Context Protocol (MCP) server that enables AI assistants to interact with OpenAI's ChatGPT API.
+A Model Context Protocol (MCP) server that enables AI assistants to interact
+with OpenAI's ChatGPT API.
 
 ## Features
 
-- **Chat Completion**: Generate text using OpenAI's language models (GPT-4o, GPT-4, GPT-3.5-turbo)
+- **Chat Completion**: Generate text using OpenAI's latest language models
+  (GPT-4.1, GPT-4.1-mini, GPT-4.1-nano, GPT-4o, o1, o1-pro, o3, o4-mini)
 - **List Models**: Retrieve available OpenAI models
-- **Configurable Parameters**: Control temperature, max tokens, and other generation settings
+- **Configurable Parameters**: Control temperature, max tokens, and other
+  generation settings
 
 ## Prerequisites
 
@@ -66,7 +69,7 @@ Generate text using ChatGPT.
 
 Parameters:
 
-- `model` (string, optional): Model to use (default: "gpt-4o")
+- `model` (string, optional): Model to use (default: "gpt-4.1")
 - `messages` (array, required): Chat history with role and content
 - `temperature` (number, optional): Sampling temperature 0-2 (default: 0.7)
 - `max_tokens` (number, optional): Maximum tokens to generate (default: 1000)
@@ -108,7 +111,8 @@ MIT License - see LICENSE file for details
 
 ## Release Process
 
-This project uses [semantic-release](https://github.com/semantic-release/semantic-release) for automated versioning and publishing.
+This project uses [semantic-release](https://github.com/semantic-release/semantic-release)
+for automated versioning and publishing.
 
 ### Commit Message Format
 

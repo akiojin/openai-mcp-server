@@ -42,7 +42,7 @@ const DEFAULT_CONFIG: ServerConfig = {
     description: 'OpenAI API MCP Server',
   },
   openai: {
-    defaultModel: 'gpt-4o',
+    defaultModel: 'gpt-4.1',
     defaultTemperature: 0.7,
     defaultMaxTokens: 1000,
     timeout: 30000,
@@ -70,7 +70,7 @@ const DEFAULT_CONFIG: ServerConfig = {
 
 export class ConfigManager {
   private config: ServerConfig;
-  private static instance: ConfigManager;
+  public static instance: ConfigManager | null;
 
   private constructor() {
     this.config = this.loadConfig();

@@ -56,8 +56,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             model: {
               type: 'string',
               description:
-                'OpenAI model to use for text generation. Choose "gpt-4o" for best quality and multimodal support, "gpt-4" for high-quality reasoning, or "gpt-3.5-turbo" for faster and cost-effective responses. Default is "gpt-4o".',
-              default: 'gpt-4o',
+                'OpenAI model to use for text generation. Choose "gpt-4.1" for best coding and long-context support, "gpt-4.1-mini" for faster performance at lower cost, "gpt-4.1-nano" for fastest/cheapest option, "gpt-4o" for previous generation, "o1" for initial reasoning model, "o1-pro" for advanced reasoning capabilities, "o3" for most advanced reasoning, "o4-mini" for efficient reasoning with tools support. Default is "gpt-4.1".',
+              default: 'gpt-4.1',
             },
             messages: {
               type: 'array',

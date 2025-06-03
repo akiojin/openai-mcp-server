@@ -13,6 +13,8 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
+    "report:models": "npx tsx scripts/model-performance-report.ts",
+    "report:models:save": "mkdir -p reports && npx tsx scripts/model-performance-report.ts > reports/model-performance-$(date +%Y%m%d-%H%M%S).md",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
