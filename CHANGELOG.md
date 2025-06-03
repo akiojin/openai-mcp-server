@@ -19,18 +19,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input validation and sanitization
 - Enhanced error handling for OpenAI API operations
 - TypeScript strict mode compliance
+- OpenAI SDK type definitions for better type safety
+- Comprehensive error classification system (src/errors.ts)
+- Environment variable validation at startup (src/env-validator.ts)
+- API key format validation with sanitized logging
 
 ### Changed
 
 - Migrated ESLint configuration from .js to .cjs format for better compatibility
 - Improved tool descriptions with detailed information
 - Enhanced error messages with structured error objects
+- Refactored error handling to use custom error classes
+- Updated type definitions to use OpenAI SDK types directly
+- Improved startup validation with detailed error messages
 
 ### Security
 
 - Added API key validation
 - Implemented input sanitization options
 - Enhanced error handling to prevent information leakage
+- API key format validation with proper error messages
+- Sanitized API key logging to prevent credential exposure
+- Environment variable validation to ensure secure configuration
 
 ## [0.1.0] - 2025-06-03
 
