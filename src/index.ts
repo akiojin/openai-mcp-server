@@ -4,6 +4,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import { logger } from './logger.js';
+import { config } from './config.js';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -16,11 +18,12 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const serverConfig = config.get('server');
 const server = new Server(
   {
-    name: 'openai-mcp-server',
-    version: '0.1.0',
-    description: 'OpenAI API MCP Server',
+    name: serverConfig.name,
+    version: serverConfig.version,
+    description: serverConfig.description,
   },
   {
     capabilities: {
@@ -100,6 +103,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
 server.setRequestHandler(CallToolRequestSchema, async request => {
   const { name, arguments: args } = request.params;
+  const requestId = logger.generateRequestId();
+  const startTime = Date.now();
+
+  logger.toolRequest(name, requestId, args);
 
   try {
     switch (name) {
@@ -129,17 +136,27 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           }
         }
 
+        const openaiConfig = config.get('openai');
         const {
-          model = 'gpt-4o',
+          model = openaiConfig.defaultModel,
           messages,
-          temperature = 0.7,
-          max_tokens = 1000,
+          temperature = openaiConfig.defaultTemperature,
+          max_tokens = openaiConfig.defaultMaxTokens,
         } = {
-          model: typeof typedArgs.model === 'string' ? typedArgs.model : 'gpt-4o',
+          model: typeof typedArgs.model === 'string' ? typedArgs.model : openaiConfig.defaultModel,
           messages: typedArgs.messages as ChatMessage[],
-          temperature: typeof typedArgs.temperature === 'number' ? typedArgs.temperature : 0.7,
-          max_tokens: typeof typedArgs.max_tokens === 'number' ? typedArgs.max_tokens : 1000,
+          temperature:
+            typeof typedArgs.temperature === 'number'
+              ? typedArgs.temperature
+              : openaiConfig.defaultTemperature,
+          max_tokens:
+            typeof typedArgs.max_tokens === 'number'
+              ? typedArgs.max_tokens
+              : openaiConfig.defaultMaxTokens,
         };
+
+        logger.openaiRequest(requestId, model);
+        const apiStartTime = Date.now();
 
         const completion = await openai.chat.completions.create({
           model,
@@ -148,17 +165,39 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           max_tokens,
         });
 
-        return {
-          result: {
-            content: completion.choices[0]?.message?.content || '',
-            usage: completion.usage,
-            model: completion.model,
-          },
+        const apiDuration = Date.now() - apiStartTime;
+
+        if (completion.usage) {
+          logger.openaiResponse(requestId, completion.model, completion.usage, apiDuration);
+        }
+
+        const result = {
+          content: completion.choices[0]?.message?.content || '',
+          usage: completion.usage,
+          model: completion.model,
         };
+
+        logger.toolResponse(name, requestId, true, Date.now() - startTime, {
+          model: completion.model,
+          tokenUsage: completion.usage
+            ? {
+                prompt: completion.usage.prompt_tokens,
+                completion: completion.usage.completion_tokens,
+                total: completion.usage.total_tokens,
+              }
+            : undefined,
+        });
+
+        return { result };
       }
 
       case 'list_models': {
+        logger.openaiRequest(requestId, 'models-list');
+        const apiStartTime = Date.now();
+
         const models = await openai.models.list();
+        const apiDuration = Date.now() - apiStartTime;
+
         const chatModels = models.data
           .filter(model => model.id.includes('gpt'))
           .map(model => ({
@@ -166,21 +205,39 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             created: new Date(model.created * 1000).toISOString(),
           }));
 
-        return {
-          result: {
-            models: chatModels,
-            count: chatModels.length,
-          },
+        logger.info('Models list retrieved', {
+          requestId,
+          count: chatModels.length,
+          duration: apiDuration,
+        });
+
+        const result = {
+          models: chatModels,
+          count: chatModels.length,
         };
+
+        logger.toolResponse(name, requestId, true, Date.now() - startTime);
+
+        return { result };
       }
 
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
+    const duration = Date.now() - startTime;
+
     // Enhanced OpenAI API error handling
     if (error instanceof OpenAI.APIError) {
       const statusCode = error.status;
+
+      logger.openaiError(requestId, name, error, statusCode, duration);
+      logger.toolResponse(name, requestId, false, duration, {
+        error: {
+          code: `HTTP_${statusCode}`,
+          message: error.message,
+        },
+      });
 
       switch (statusCode) {
         case 401:
@@ -225,6 +282,24 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
     }
 
     if (error instanceof Error) {
+      logger.error('Tool request failed', {
+        requestId,
+        toolName: name,
+        duration,
+        error: {
+          code: 'TOOL_ERROR',
+          message: error.message,
+          stack: error.stack,
+        },
+      });
+
+      logger.toolResponse(name, requestId, false, duration, {
+        error: {
+          code: 'TOOL_ERROR',
+          message: error.message,
+        },
+      });
+
       return {
         error: {
           code: 'TOOL_ERROR',
@@ -232,6 +307,14 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         },
       };
     }
+
+    logger.error('Unknown error occurred', {
+      requestId,
+      toolName: name,
+      duration,
+    });
+
+    logger.toolResponse(name, requestId, false, duration);
 
     return {
       error: {
@@ -243,19 +326,55 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 });
 
 async function main() {
+  logger.info('Starting OpenAI MCP Server', {
+    version: process.env.npm_package_version || '0.1.0',
+    nodeVersion: process.version,
+    logLevel: process.env.LOG_LEVEL || 'info',
+  });
+
   if (!process.env.OPENAI_API_KEY) {
+    logger.error('OPENAI_API_KEY environment variable is not set');
     console.error('Error: OPENAI_API_KEY environment variable is not set');
     console.error('Please set OPENAI_API_KEY in your .env file');
     process.exit(1);
   }
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  try {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
 
-  console.error('OpenAI MCP Server is running...');
+    logger.info('OpenAI MCP Server started successfully');
+    console.error('OpenAI MCP Server is running...');
+  } catch (error) {
+    logger.error('Failed to start server', {
+      error: {
+        code: 'STARTUP_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+    });
+    throw error;
+  }
 }
 
+process.on('SIGINT', () => {
+  logger.info('Received SIGINT, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  logger.info('Received SIGTERM, shutting down gracefully');
+  process.exit(0);
+});
+
 main().catch(error => {
+  logger.error('Server startup failed', {
+    error: {
+      code: 'STARTUP_FAILURE',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    },
+  });
   console.error('Failed to start server:', error);
   process.exit(1);
 });

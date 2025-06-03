@@ -1,0 +1,31 @@
+{
+  "server": {
+    "name": "openai-mcp-server",
+    "version": "0.1.0",
+    "description": "OpenAI API MCP Server"
+  },
+  "openai": {
+    "defaultModel": "gpt-4o",
+    "defaultTemperature": 0.7,
+    "defaultMaxTokens": 1000,
+    "timeout": 30000,
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+  "logging": {
+    "level": "info",
+    "enablePretty": true,
+    "enableFileLogging": false
+  },
+  "security": {
+    "enableApiKeyValidation": true,
+    "enableRateLimiting": false,
+    "maxRequestsPerMinute": 60,
+    "enableInputSanitization": true
+  },
+  "performance": {
+    "enableCaching": false,
+    "cacheExpiry": 300000,
+    "enableMetrics": false
+  }
+}
