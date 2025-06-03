@@ -68,7 +68,7 @@ const DEFAULT_CONFIG: ServerConfig = {
   },
 };
 
-class ConfigManager {
+export class ConfigManager {
   private config: ServerConfig;
   private static instance: ConfigManager;
 

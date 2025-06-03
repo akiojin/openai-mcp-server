@@ -2,75 +2,34 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import OpenAI from 'openai';
-import type {
-  ChatCompletionMessageParam,
-  ChatCompletionCreateParamsNonStreaming,
-} from 'openai/resources/index.js';
 import dotenv from 'dotenv';
-import { logger } from './logger.js';
-import { config } from './config.js';
-import {
-  ErrorCode,
-  MCPError,
-  mapOpenAIErrorToMCPError,
-  isOpenAIError,
-  ValidationError,
-} from './errors.js';
-import { EnvironmentValidator } from './env-validator.js';
-
-interface ChatCompletionArgs {
-  model?: string;
-  messages: ChatCompletionMessageParam[];
-  temperature?: number;
-  max_tokens?: number;
-}
+import { ErrorCode, MCPError, mapOpenAIErrorToMCPError, isOpenAIError } from './errors.js';
+import { DependencyContainer } from './container/dependency-container.js';
+import { ToolExecutionContext } from './interfaces.js';
 
 dotenv.config();
 
-// Validate environment variables early
-let envConfig: ReturnType<typeof EnvironmentValidator.validate>;
+// 依存性注入コンテナを初期化
+const container = new DependencyContainer();
+
+// 依存関係を取得
+let logger: ReturnType<typeof container.getLogger>;
+let config: ReturnType<typeof container.getConfigManager>;
+let openaiClient: ReturnType<typeof container.getOpenAIClient>;
+let cacheService: ReturnType<typeof container.getCacheService>;
+
 try {
-  envConfig = EnvironmentValidator.validate();
+  logger = container.getLogger();
+  config = container.getConfigManager();
+  openaiClient = container.getOpenAIClient();
+  cacheService = container.getCacheService();
 } catch (error) {
-  if (error instanceof MCPError) {
-    const errorDetails = error.toJSON();
-    logger.error('Environment validation failed', {
-      error: errorDetails,
-    });
-    console.error(`Environment validation failed:\n${error.message}`);
-  } else {
-    logger.error('Environment validation failed', {
-      error: {
-        code: ErrorCode.ENVIRONMENT_ERROR,
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-    });
-    console.error('Environment validation failed:', error);
-  }
+  // 初期化エラー時の対応
+  console.error('Failed to initialize dependencies:', error);
   process.exit(1);
 }
 
-// Validate API key format
-if (!EnvironmentValidator.validateApiKey(envConfig.OPENAI_API_KEY)) {
-  const sanitizedKey = EnvironmentValidator.sanitizeApiKeyForLogging(envConfig.OPENAI_API_KEY);
-  logger.error('Invalid OpenAI API key format', {
-    error: {
-      code: ErrorCode.INVALID_API_KEY,
-      message: 'API key does not match expected format',
-    },
-    args: { sanitizedKey },
-  });
-  console.error(`Invalid OpenAI API key format: ${sanitizedKey}`);
-  console.error('Expected format: sk-... (at least 20 characters)');
-  process.exit(1);
-}
-
-const openai = new OpenAI({
-  apiKey: envConfig.OPENAI_API_KEY,
-});
-
-const serverConfig = config.get('server');
+const serverConfig = config.get('server') as any;
 const server = new Server(
   {
     name: serverConfig.name,
@@ -161,158 +120,43 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
   logger.toolRequest(name, requestId, args);
 
   try {
-    switch (name) {
-      case 'chat_completion': {
-        // Input validation
-        if (!args || typeof args !== 'object') {
-          throw new ValidationError('Expected object', 'arguments', args);
-        }
-
-        // Type guard to ensure args has the expected shape
-        if (!('messages' in args)) {
-          throw new ValidationError('messages field is required', 'messages');
-        }
-
-        const typedArgs = args as unknown as ChatCompletionArgs;
-
-        if (!Array.isArray(typedArgs.messages)) {
-          throw new ValidationError('messages must be an array', 'messages', typedArgs.messages);
-        }
-
-        // Validate messages structure
-        for (let index = 0; index < typedArgs.messages.length; index++) {
-          const message = typedArgs.messages[index];
-          if (!message || typeof message !== 'object') {
-            throw new ValidationError(
-              'Each message must be an object',
-              `messages[${index}]`,
-              message
-            );
-          }
-          if (!('role' in message) || typeof message.role !== 'string') {
-            throw new ValidationError('role must be a string', `messages[${index}].role`, message);
-          }
-          if (!['system', 'user', 'assistant', 'function', 'tool'].includes(message.role)) {
-            throw new ValidationError(
-              'role must be one of: system, user, assistant, function, tool',
-              `messages[${index}].role`,
-              message.role
-            );
-          }
-          if (
-            'content' in message &&
-            message.content !== null &&
-            typeof message.content !== 'string'
-          ) {
-            throw new ValidationError(
-              'content must be a string or null',
-              `messages[${index}].content`,
-              message.content
-            );
-          }
-        }
-
-        const openaiConfig = config.get('openai');
-        const model = typedArgs.model || openaiConfig.defaultModel;
-        const messages = typedArgs.messages;
-        const temperature = typedArgs.temperature ?? openaiConfig.defaultTemperature;
-        const max_tokens = typedArgs.max_tokens ?? openaiConfig.defaultMaxTokens;
-
-        // Validate temperature range
-        if (temperature < 0 || temperature > 2) {
-          throw new ValidationError('must be between 0 and 2', 'temperature', temperature);
-        }
-
-        // Validate max_tokens
-        if (max_tokens < 1) {
-          throw new ValidationError('must be at least 1', 'max_tokens', max_tokens);
-        }
-
-        logger.openaiRequest(requestId, model);
-        const apiStartTime = Date.now();
-
-        const completionParams: ChatCompletionCreateParamsNonStreaming = {
-          model,
-          messages,
-          temperature,
-          max_tokens,
-        };
-
-        const completion = await openai.chat.completions.create(completionParams);
-
-        const apiDuration = Date.now() - apiStartTime;
-
-        if (completion.usage) {
-          logger.openaiResponse(requestId, completion.model, completion.usage, apiDuration);
-        }
-
-        const result = {
-          content: completion.choices[0]?.message?.content || '',
-          usage: completion.usage,
-          model: completion.model,
-        };
-
-        logger.toolResponse(name, requestId, true, Date.now() - startTime, {
-          model: completion.model,
-          tokenUsage: completion.usage
-            ? {
-                prompt: completion.usage.prompt_tokens,
-                completion: completion.usage.completion_tokens,
-                total: completion.usage.total_tokens,
-              }
-            : undefined,
-        });
-
-        return { result };
-      }
-
-      case 'list_models': {
-        logger.openaiRequest(requestId, 'models-list');
-        const apiStartTime = Date.now();
-
-        const modelsResponse = await openai.models.list();
-        const apiDuration = Date.now() - apiStartTime;
-
-        const chatModels = modelsResponse.data
-          .filter(model => model.id.includes('gpt') || model.id.includes('o1'))
-          .map(model => ({
-            id: model.id,
-            created: new Date(model.created * 1000).toISOString(),
-            owned_by: model.owned_by,
-          }));
-
-        logger.info('Models list retrieved', {
-          requestId,
-          count: chatModels.length,
-          duration: apiDuration,
-        });
-
-        const result = {
-          models: chatModels,
-          count: chatModels.length,
-        };
-
-        logger.toolResponse(name, requestId, true, Date.now() - startTime);
-
-        return { result };
-      }
-
-      default:
-        throw new MCPError(ErrorCode.UNKNOWN_TOOL, `Unknown tool: ${name}`, { toolName: name });
+    // ツールハンドラーを取得
+    const toolHandler = container.getToolHandler(name);
+    if (!toolHandler) {
+      throw new MCPError(ErrorCode.UNKNOWN_TOOL, `Unknown tool: ${name}`, { toolName: name });
     }
+
+    // ツール実行コンテキストを構築
+    const context: ToolExecutionContext = {
+      openaiClient,
+      logger,
+      config,
+      environmentProvider: container.getEnvironmentProvider(),
+      cacheService,
+    };
+
+    // ツールを実行
+    const result = await toolHandler.execute(args, context);
+
+    logger.toolResponse(name, requestId, true, Date.now() - startTime, {
+      model: result.model,
+      tokenUsage: result.usage
+        ? {
+            prompt: result.usage.prompt_tokens,
+            completion: result.usage.completion_tokens,
+            total: result.usage.total_tokens,
+          }
+        : undefined,
+    });
+
+    return { result };
   } catch (error) {
     const duration = Date.now() - startTime;
 
     // Enhanced error handling
     if (isOpenAIError(error)) {
-      const mcpError = mapOpenAIErrorToMCPError(error as InstanceType<typeof OpenAI.APIError>);
-      logger.openaiError(
-        requestId,
-        name,
-        error as InstanceType<typeof OpenAI.APIError>,
-        mcpError.statusCode,
-        duration
-      );
+      const mcpError = mapOpenAIErrorToMCPError(error as any);
+      logger.openaiError(requestId, name, error as Error, mcpError.statusCode, duration);
       logger.toolResponse(name, requestId, false, duration);
 
       return {
@@ -386,12 +230,14 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 });
 
 async function main() {
+  const envProvider = container.getEnvironmentProvider();
+
   logger.info('Starting OpenAI MCP Server', {
     version: process.env.npm_package_version || '0.1.0',
     nodeVersion: process.version,
-    logLevel: envConfig.LOG_LEVEL || 'info',
+    logLevel: envProvider.get('LOG_LEVEL') || 'info',
     args: {
-      environment: envConfig.NODE_ENV || 'development',
+      environment: envProvider.get('NODE_ENV') || 'development',
     },
   });
 
@@ -415,11 +261,13 @@ async function main() {
 
 process.on('SIGINT', () => {
   logger.info('Received SIGINT, shutting down gracefully');
+  cacheService.dispose();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   logger.info('Received SIGTERM, shutting down gracefully');
+  cacheService.dispose();
   process.exit(0);
 });
 

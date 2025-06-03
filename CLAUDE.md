@@ -137,6 +137,11 @@ npm start
 - [x] 構造化ログシステムの実装
 - [x] ユニットテストの実装（Jest）
 - [x] 設定ファイル（config.json）の実装
+- [x] リクエスト/レスポンスキャッシュ機能の実装
+  - [x] インメモリキャッシュ（LRU、TTL対応）
+  - [x] ChatGPT API レスポンスキャッシュ
+  - [x] モデル一覧キャッシュ
+  - [x] 設定可能なキャッシュサイズ・有効期限
 - [x] OpenAI SDK型定義の活用
 - [x] エラー分類と適切なエラーコード定義
 - [x] 環境変数検証の強化
@@ -144,6 +149,16 @@ npm start
 - [x] テストカバレッジを80%以上に向上（81.68%達成）
 - [x] エラーケースの網羅的なテスト追加（errors.tsとenv-validator.tsのテスト実装）
 - [x] GitHub Actions設定（CI/CD、カバレッジレポート、リリース自動化）
+- [x] 統合テストの実装（OpenAI APIモック使用）
+- [x] 依存性注入パターンの導入（テスタビリティ向上）
+- [x] semantic-release実装（自動バージョニング・リリース）
+- [x] conventional commits設定（commitlint）
+- [x] commitizen統合（対話式コミット作成）
+- [x] GitHub Actions workflow更新（semantic-releaseサポート）
+- [x] npm公開設定（automatic publishing）
+- [x] CHANGELOG.md自動生成設定
+- [x] Husky commit-msgフック追加
+- [x] リクエスト/レスポンスキャッシュ機能の実装
 
 ## 進行中タスク
 
@@ -153,12 +168,7 @@ npm start
 
 #### テスト・品質向上
 
-- [ ] 統合テストの実装（OpenAI APIモック使用）
-- [ ] 依存性注入パターンの導入（テスタビリティ向上）
-
 #### CI/CD・自動化
-
-- [ ] セマンティックバージョニングの自動化
 
 #### パフォーマンス・信頼性
 - [ ] リクエスト/レスポンスキャッシュ機能の実装

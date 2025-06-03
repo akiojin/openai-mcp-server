@@ -106,11 +106,66 @@ openai-mcp-server/
 
 MIT License - see LICENSE file for details
 
+## Release Process
+
+This project uses [semantic-release](https://github.com/semantic-release/semantic-release) for automated versioning and publishing.
+
+### Commit Message Format
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```text
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+#### Commit Types
+
+- `feat:` new feature (minor version bump)
+- `fix:` bug fix (patch version bump)
+- `BREAKING CHANGE:` breaking change (major version bump)
+- `docs:` documentation changes (patch version bump)
+- `style:` formatting changes (patch version bump)
+- `refactor:` code refactoring (patch version bump)
+- `test:` adding tests (patch version bump)
+- `chore:` maintenance tasks (patch version bump)
+
+#### Examples
+
+```bash
+# New feature (0.1.0 → 0.2.0)
+feat: add streaming support for chat completion
+
+# Bug fix (0.1.0 → 0.1.1)
+fix: handle connection timeout properly
+
+# Breaking change (0.1.0 → 1.0.0)
+feat: redesign API interface
+
+BREAKING CHANGE: The chat_completion tool now requires a different parameter structure
+```
+
+### Helper Scripts
+
+```bash
+# Interactive commit with commitizen
+npm run commit
+
+# Test release without publishing
+npm run release:dry-run
+
+# Manual release (usually handled by CI)
+npm run release
+```
+
 ## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+3. Follow conventional commit format for your commits
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 

@@ -28,7 +28,7 @@ export interface LogContext {
   updates?: unknown;
 }
 
-class Logger {
+export class Logger {
   private logger: PinoLogger;
   private static instance: Logger;
 

@@ -24,8 +24,16 @@
     "enableInputSanitization": true
   },
   "performance": {
-    "enableCaching": false,
+    "enableCaching": true,
     "cacheExpiry": 300000,
     "enableMetrics": false
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 300000,
+    "maxSize": 1000,
+    "strategy": "LRU",
+    "chatCompletionTtl": 300000,
+    "modelListTtl": 3600000
   }
 }
