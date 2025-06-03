@@ -46,7 +46,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.6.0",
     "dotenv": "^16.0.0",
-    "openai": "^4.0.0",
+    "openai": "^5.0.2",
     "pino": "^8.0.0"
   },
   "devDependencies": {
