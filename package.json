@@ -44,7 +44,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.6.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "dotenv": "^16.0.0",
     "openai": "^4.0.0",
     "pino": "^8.0.0"
