@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Comprehensive test suite for error handling (errors.test.ts)
+- Comprehensive test suite for environment validation (env-validator.test.ts)
+- Unit tests for input validation logic (index.test.ts)
+- Test coverage increased from 36.45% to 81.68%
+
 - ESLint configuration for code quality and consistency
 - Prettier configuration for code formatting
 - Husky pre-commit hooks for automated quality checks
