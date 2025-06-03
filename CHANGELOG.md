@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test suite for environment validation (env-validator.test.ts)
 - Unit tests for input validation logic (index.test.ts)
 - Test coverage increased from 36.45% to 81.68%
+- GitHub Actions CI/CD workflows
+  - Continuous Integration workflow (ci.yml)
+  - Automated release workflow (release.yml)
+  - Code coverage reporting workflow (coverage.yml)
+- Dependabot configuration for automated dependency updates
 
 - ESLint configuration for code quality and consistency
 - Prettier configuration for code formatting
