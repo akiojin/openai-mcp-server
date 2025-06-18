@@ -28,7 +28,8 @@
       "Bash(npm run report:models:save:*)",
       "Bash(git reset:*)",
       "Bash(git commit:*)",
-      "mcp__openai__generate_image"
+      "mcp__openai__generate_image",
+      "Bash(npm version:*)"
     ],
     "deny": []
   },
