@@ -78,6 +78,28 @@ Parameters:
 
 List all available OpenAI models.
 
+#### generate_image
+
+Generate images using GPT-image-1.
+
+Parameters:
+- `prompt` (string, required): Text description of the desired image(s)
+- `model` (string, optional): Model to use (default: "gpt-image-1")
+- `n` (number, optional): Number of images to generate 1-10 (default: 1)
+- `size` (string, optional): Size of images - "256x256", "512x512", "1024x1024", "1792x1024", or "1024x1792" (default: "1024x1024")
+- `quality` (string, optional): Quality - "standard" or "hd" (default: "standard")
+- `style` (string, optional): Style - "vivid" or "natural" (default: "vivid")
+
+Example:
+```json
+{
+  "prompt": "A beautiful sunset over mountains",
+  "size": "1024x1024",
+  "quality": "hd",
+  "style": "natural"
+}
+```
+
 ## Development
 
 ```bash
