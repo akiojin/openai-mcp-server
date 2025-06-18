@@ -102,7 +102,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'generate_image',
         description:
-          'Generate images using gpt-image-1 model. Returns file IDs for generated images. REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
+          'Generate images using gpt-image-1 model. Returns URLs for generated images. REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
         inputSchema: {
           type: 'object',
           properties: {
@@ -253,7 +253,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             model: args.model || 'gpt-image-1',
             n: args.n || 1,
             size: args.size || '1024x1024',
-            response_format: 'b64_json', // Base64形式を明示的に指定
+            response_format: 'url', // URL形式を明示的に指定
           };
 
           // オプションパラメータ
@@ -291,26 +291,13 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
           const data = (await response.json()) as any;
 
-          // Base64形式の画像をFiles APIを使用してアップロード
-          const fileIds: string[] = [];
+          // URL形式の画像を返す
+          const urls: string[] = [];
           const images = data.data || [];
 
-          for (let i = 0; i < images.length; i++) {
-            const imageData = images[i];
-            if (imageData.b64_json) {
-              // Base64をBufferに変換
-              const buffer = Buffer.from(imageData.b64_json, 'base64');
-
-              // Blobを作成
-              const blob = new Blob([buffer], { type: 'image/png' });
-
-              // Files APIにアップロード
-              const file = await openai.files.create({
-                file: new File([blob], `generated_image_${i + 1}.png`, { type: 'image/png' }),
-                purpose: 'vision',
-              });
-
-              fileIds.push(file.id);
+          for (const imageData of images) {
+            if (imageData.url) {
+              urls.push(imageData.url);
             }
           }
 
@@ -319,9 +306,8 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
               {
                 type: 'text',
                 text: JSON.stringify({
-                  file_ids: fileIds,
-                  count: fileIds.length,
-                  note: 'Images have been uploaded and are available via file IDs',
+                  urls: urls,
+                  count: urls.length,
                 }),
               },
             ],
