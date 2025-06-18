@@ -279,15 +279,13 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
           const data = await response.json() as any;
 
+          // gpt-image-1はBase64のみ返すため、URLはサポートされていません
           return {
             content: [{
               type: 'text',
               text: JSON.stringify({
-                images: data.data.map((img: any) => ({
-                  url: img.url,
-                  revised_prompt: img.revised_prompt,
-                })),
-                created: data.created,
+                error: 'gpt-image-1 model only returns Base64 format. URL format is not supported.',
+                note: 'This implementation only supports URL format images. Base64 is not supported.',
               }),
             }],
           };
