@@ -167,11 +167,14 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         } as any);
 
         return {
-          result: {
-            content: completion.choices[0]?.message?.content || '',
-            usage: completion.usage,
-            model: completion.model,
-          },
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              content: completion.choices[0]?.message?.content || '',
+              usage: completion.usage,
+              model: completion.model,
+            }, null, 2)
+          }]
         };
       }
 
@@ -195,10 +198,13 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           }));
 
         return {
-          result: {
-            models: chatModels,
-            count: chatModels.length,
-          },
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              models: chatModels,
+              count: chatModels.length,
+            }, null, 2)
+          }]
         };
       }
 
@@ -262,14 +268,17 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         const response = await httpResponse.json() as any;
 
         return {
-          result: {
-            images: response.data?.map((image: any) => ({
-              url: image.url,
-              b64_json: image.b64_json,
-              revised_prompt: image.revised_prompt,
-            })) || [],
-            created: new Date().toISOString(),
-          },
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              images: response.data?.map((image: any) => ({
+                url: image.url,
+                b64_json: image.b64_json,
+                revised_prompt: image.revised_prompt,
+              })) || [],
+              created: new Date().toISOString(),
+            }, null, 2)
+          }]
         };
       }
 
