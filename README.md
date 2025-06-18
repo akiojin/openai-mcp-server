@@ -80,23 +80,25 @@ List all available OpenAI models.
 
 #### generate_image
 
-Generate images using GPT-image-1.
+Generate images using gpt-image-1 model. Returns file paths for generated images saved in temporary directory.
 
 Parameters:
-- `prompt` (string, required): Text description of the desired image(s)
+- `prompt` (string, required): Text description of the desired image(s). Maximum 1000 characters.
 - `model` (string, optional): Model to use (default: "gpt-image-1")
 - `n` (number, optional): Number of images to generate 1-10 (default: 1)
-- `size` (string, optional): Size of images - "256x256", "512x512", "1024x1024", "1792x1024", or "1024x1792" (default: "1024x1024")
-- `quality` (string, optional): Quality - "standard" or "hd" (default: "standard")
-- `style` (string, optional): Style - "vivid" or "natural" (default: "vivid")
+- `size` (string, optional): Size of images - "1024x1024", "1024x1536", "1536x1024", or "auto" (default: "1024x1024")
+- `quality` (string, optional): Quality - "low", "medium", "high", or "auto" (default: "auto")
+- `background` (string, optional): Background type - "opaque" or "transparent" (default: "opaque")
+
+Note: Generated images are saved as temporary files to minimize token usage. The response includes file paths instead of base64 data.
 
 Example:
 ```json
 {
   "prompt": "A beautiful sunset over mountains",
   "size": "1024x1024",
-  "quality": "hd",
-  "style": "natural"
+  "quality": "high",
+  "background": "opaque"
 }
 ```
 

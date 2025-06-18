@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2025-06-18
+
+### Fixed
+- 画像生成機能をテンポラリファイル保存方式に変更し、トークン消費を大幅削減
+- Base64データを直接返す代わりに、一時ファイルとして保存してファイルパスのみを返すように修正
+- response_formatパラメータを削除（gpt-image-1はデフォルトでBase64を返すため不要）
+
+## [0.2.1] - 2025-06-18
+
+### Fixed
+- 画像生成機能の実装を複数回修正
+- ESLint設定をv9形式（eslint.config.js）に移行
+
+### Changed
+- 不要なドキュメントファイル（DEPENDENCY_INJECTION.md、HANDOVER.md）を削除
+
 ## [Unreleased]
 
 ### Added
