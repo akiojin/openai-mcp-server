@@ -137,6 +137,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['prompt'],
         },
       },
+      {
+        name: 'get_version',
+        description:
+          'Get the version number of this MCP server.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -277,6 +286,25 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
                 revised_prompt: image.revised_prompt,
               })) || [],
               created: new Date().toISOString(),
+            }, null, 2)
+          }]
+        };
+      }
+
+      case 'get_version': {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              version: '0.1.0',
+              description: 'OpenAI MCP Server with image generation',
+              last_updated: '2025-06-18',
+              features: [
+                'chat_completion',
+                'list_models',
+                'generate_image',
+                'get_version'
+              ]
             }, null, 2)
           }]
         };

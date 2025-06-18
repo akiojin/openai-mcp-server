@@ -203,9 +203,30 @@ describe('OpenAI MCP Server', () => {
 
     it('未知のツール名のエラーハンドリングを確認', () => {
       const unknownToolName = 'unknown_tool';
-      const validToolNames = ['chat_completion', 'list_models', 'generate_image'];
+      const validToolNames = ['chat_completion', 'list_models', 'generate_image', 'get_version'];
       
       expect(validToolNames).not.toContain(unknownToolName);
+    });
+  });
+
+  describe('バージョン機能', () => {
+    it('バージョン情報の構造を確認', () => {
+      const versionInfo = {
+        version: '0.1.0',
+        description: 'OpenAI MCP Server with image generation',
+        last_updated: '2025-06-18',
+        features: [
+          'chat_completion',
+          'list_models',
+          'generate_image',
+          'get_version'
+        ]
+      };
+
+      expect(versionInfo.version).toBe('0.1.0');
+      expect(versionInfo.description).toContain('OpenAI MCP Server');
+      expect(versionInfo.features).toHaveLength(4);
+      expect(versionInfo.features).toContain('get_version');
     });
   });
 });
