@@ -102,7 +102,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'generate_image',
         description:
-          'Generate images using gpt-image-1 model. **IMPORTANT: Use only when explicitly requested.** REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
+          'Generate images using gpt-image-1 model. **NOTE: This tool is currently not functional as gpt-image-1 only returns Base64 format, which is not supported in this implementation. URL format is required but not available.** REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
         inputSchema: {
           type: 'object',
           properties: {
