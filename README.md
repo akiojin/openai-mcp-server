@@ -46,6 +46,14 @@ OPENAI_API_KEY=your_api_key_here
 
 ## Usage
 
+### 使用例
+
+このMCPサーバーは、Claude CodeなどのAIアシスタントから呼び出して使用することを想定しています：
+
+- **出力結果の検証**: Claude Codeの出力結果をChatGPTに検証させることができます
+- **画像生成**: Claude Codeでは直接画像生成ができませんが、このMCPサーバー経由でChatGPTのgpt-image-1モデルを使用した画像生成が可能です
+- **異なるモデルの活用**: 用途に応じて様々なOpenAIモデル（GPT-4.1、o1、o3など）を使い分けることができます
+
 ### As an MCP Server
 
 Add the server to your MCP client configuration:
