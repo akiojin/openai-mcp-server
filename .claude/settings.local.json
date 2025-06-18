@@ -29,5 +29,9 @@
       "Bash(git reset:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "brave-search",
+    "context7"
+  ]
 }
