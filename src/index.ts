@@ -90,6 +90,53 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
+      {
+        name: 'generate_image',
+        description:
+          'Generate images using gpt-image-1 model. **IMPORTANT: Use only when explicitly requested.** REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            prompt: {
+              type: 'string',
+              description:
+                'A text description of the desired image(s). Maximum length is 1000 characters.',
+            },
+            model: {
+              type: 'string',
+              description: 'The model to use for image generation. Default is "gpt-image-1".',
+              default: 'gpt-image-1',
+            },
+            n: {
+              type: 'number',
+              description: 'Number of images to generate. Must be between 1 and 10. Default is 1.',
+              default: 1,
+              minimum: 1,
+              maximum: 10,
+            },
+            size: {
+              type: 'string',
+              description:
+                'Size of the generated images. Must be one of "1024x1024", "1024x1536", "1536x1024", or "auto". Default is "1024x1024".',
+              enum: ['1024x1024', '1024x1536', '1536x1024', 'auto'],
+              default: '1024x1024',
+            },
+            quality: {
+              type: 'string',
+              description: 'Quality of the image. "low", "medium", "high", or "auto". Default is "auto".',
+              enum: ['low', 'medium', 'high', 'auto'],
+              default: 'auto',
+            },
+            background: {
+              type: 'string',
+              description: 'Background type. "opaque" or "transparent". Default is "opaque".',
+              enum: ['opaque', 'transparent'],
+              default: 'opaque',
+            },
+          },
+          required: ['prompt'],
+        },
+      },
     ],
   };
 });
@@ -151,6 +198,77 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           result: {
             models: chatModels,
             count: chatModels.length,
+          },
+        };
+      }
+
+      case 'generate_image': {
+        // 引数の検証
+        if (!args || !args.prompt) {
+          return {
+            error: {
+              code: 'INVALID_ARGUMENTS',
+              message: 'prompt is required',
+            },
+          };
+        }
+
+        // プロンプトの長さチェック
+        if (typeof args.prompt === 'string' && args.prompt.length > 1000) {
+          return {
+            error: {
+              code: 'INVALID_ARGUMENTS',
+              message: 'prompt must be 1000 characters or less',
+            },
+          };
+        }
+
+        // 画像生成パラメータ
+        const imageParams: any = {
+          model: args.model || 'gpt-image-1',
+          prompt: args.prompt,
+          n: args.n || 1,
+          size: args.size || '1024x1024',
+        };
+        
+        // オプションパラメータ
+        if (args.quality) {
+          imageParams.quality = args.quality;
+        }
+        if (args.background) {
+          imageParams.background = args.background;
+        }
+
+        // 画像生成APIを呼び出し（直接HTTPリクエスト）
+        const httpResponse = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(imageParams),
+        });
+        
+        if (!httpResponse.ok) {
+          const errorData = await httpResponse.json() as any;
+          return {
+            error: {
+              code: `OPENAI_ERROR_${httpResponse.status}`,
+              message: errorData.error?.message || 'Image generation failed',
+            },
+          };
+        }
+        
+        const response = await httpResponse.json() as any;
+
+        return {
+          result: {
+            images: response.data?.map((image: any) => ({
+              url: image.url,
+              b64_json: image.b64_json,
+              revised_prompt: image.revised_prompt,
+            })) || [],
+            created: new Date().toISOString(),
           },
         };
       }
