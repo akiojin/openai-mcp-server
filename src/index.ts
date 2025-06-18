@@ -4,8 +4,16 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 dotenv.config();
+
+// package.jsonの読み込み
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'));
 
 // OpenAI API キーの確認
 const apiKey = process.env.OPENAI_API_KEY;
@@ -296,9 +304,10 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           content: [{
             type: 'text',
             text: JSON.stringify({
-              version: '0.1.0',
-              description: 'OpenAI MCP Server with image generation',
-              last_updated: '2025-06-18',
+              version: packageJson.version,
+              name: packageJson.name,
+              description: packageJson.description,
+              last_updated: new Date().toISOString().split('T')[0],
               features: [
                 'chat_completion',
                 'list_models',
