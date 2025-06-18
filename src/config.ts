@@ -128,8 +128,8 @@ export class ConfigManager {
     return finalConfig;
   }
 
-  private getEnvironmentOverrides(): any {
-    const overrides: any = {};
+  private getEnvironmentOverrides(): Partial<ServerConfig> {
+    const overrides: Partial<ServerConfig> = {};
 
     // OpenAI settings
     if (process.env.OPENAI_DEFAULT_MODEL) {
@@ -171,14 +171,27 @@ export class ConfigManager {
     return overrides;
   }
 
-  private deepMerge(target: any, source: any): any {
-    const result = { ...target };
+  private deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
+    const result = { ...target } as T;
 
     for (const key in source) {
-      if (source[key] !== null && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-        result[key] = this.deepMerge(target[key] || {}, source[key]);
-      } else {
-        result[key] = source[key];
+      const sourceValue = source[key];
+      const targetValue = target[key];
+
+      if (
+        sourceValue !== null &&
+        typeof sourceValue === 'object' &&
+        !Array.isArray(sourceValue) &&
+        targetValue !== null &&
+        typeof targetValue === 'object' &&
+        !Array.isArray(targetValue)
+      ) {
+        (result as Record<string, unknown>)[key] = this.deepMerge(
+          targetValue as Record<string, unknown>,
+          sourceValue as Record<string, unknown>
+        );
+      } else if (sourceValue !== undefined) {
+        (result as Record<string, unknown>)[key] = sourceValue;
       }
     }
 
