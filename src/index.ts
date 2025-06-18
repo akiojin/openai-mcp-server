@@ -239,14 +239,17 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         try {
           // 直接HTTPリクエストでOpenAI APIを呼び出す
           const url = 'https://api.openai.com/v1/images/generations';
-          const requestBody = {
+          const requestBody: any = {
             prompt: args.prompt,
             model: args.model || 'gpt-image-1',
             n: args.n || 1,
             size: args.size || '1024x1024',
-            quality: args.quality || 'auto',
-            response_format: 'url',  // 必ずURLを指定
           };
+          
+          // オプションパラメータ
+          if (args.quality) {
+            requestBody.quality = args.quality;
+          }
 
           // backgroundパラメータがある場合は追加
           if (args.background) {
