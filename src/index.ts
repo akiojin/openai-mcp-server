@@ -102,13 +102,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'generate_image',
         description:
-          'Generate images using gpt-image-1 model. **NOTE: This tool is currently not functional as gpt-image-1 only returns Base64 format, which is not supported in this implementation. URL format is required but not available.** REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
+          'Generate images using gpt-image-1 model. Returns file IDs for generated images. REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
         inputSchema: {
           type: 'object',
           properties: {
             prompt: {
               type: 'string',
-              description: 'A text description of the desired image(s). Maximum length is 1000 characters.',
+              description:
+                'A text description of the desired image(s). Maximum length is 1000 characters.',
             },
             model: {
               type: 'string',
@@ -124,13 +125,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             size: {
               type: 'string',
-              description: 'Size of the generated images. Must be one of "1024x1024", "1024x1536", "1536x1024", or "auto". Default is "1024x1024".',
+              description:
+                'Size of the generated images. Must be one of "1024x1024", "1024x1536", "1536x1024", or "auto". Default is "1024x1024".',
               default: '1024x1024',
               enum: ['1024x1024', '1024x1536', '1536x1024', 'auto'],
             },
             quality: {
               type: 'string',
-              description: 'Quality of the image. "low", "medium", "high", or "auto". Default is "auto".',
+              description:
+                'Quality of the image. "low", "medium", "high", or "auto". Default is "auto".',
               default: 'auto',
               enum: ['low', 'medium', 'high', 'auto'],
             },
@@ -182,14 +185,16 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         } as any);
 
         return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              content: completion.choices[0]?.message?.content || '',
-              usage: completion.usage,
-              model: completion.model,
-            }),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                content: completion.choices[0]?.message?.content || '',
+                usage: completion.usage,
+                model: completion.model,
+              }),
+            },
+          ],
         };
       }
 
@@ -213,13 +218,15 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           }));
 
         return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              models: chatModels,
-              count: chatModels.length,
-            }),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                models: chatModels,
+                count: chatModels.length,
+              }),
+            },
+          ],
         };
       }
 
@@ -227,12 +234,14 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         // 引数の検証
         if (!args || !args.prompt) {
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                error: 'prompt is required',
-              }),
-            }],
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'prompt is required',
+                }),
+              },
+            ],
           };
         }
 
@@ -244,8 +253,9 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             model: args.model || 'gpt-image-1',
             n: args.n || 1,
             size: args.size || '1024x1024',
+            response_format: 'b64_json', // Base64形式を明示的に指定
           };
-          
+
           // オプションパラメータ
           if (args.quality) {
             requestBody.quality = args.quality;
@@ -259,56 +269,87 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           const response = await fetch(url, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${apiKey}`,
+              Authorization: `Bearer ${apiKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(requestBody),
           });
 
           if (!response.ok) {
-            const errorData = await response.json() as any;
+            const errorData = (await response.json()) as any;
             return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  error: errorData.error?.message || 'Image generation failed',
-                }),
-              }],
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    error: errorData.error?.message || 'Image generation failed',
+                  }),
+                },
+              ],
             };
           }
 
-          const data = await response.json() as any;
+          const data = (await response.json()) as any;
 
-          // gpt-image-1はBase64のみ返すため、URLはサポートされていません
+          // Base64形式の画像をFiles APIを使用してアップロード
+          const fileIds: string[] = [];
+          const images = data.data || [];
+
+          for (let i = 0; i < images.length; i++) {
+            const imageData = images[i];
+            if (imageData.b64_json) {
+              // Base64をBufferに変換
+              const buffer = Buffer.from(imageData.b64_json, 'base64');
+
+              // Blobを作成
+              const blob = new Blob([buffer], { type: 'image/png' });
+
+              // Files APIにアップロード
+              const file = await openai.files.create({
+                file: new File([blob], `generated_image_${i + 1}.png`, { type: 'image/png' }),
+                purpose: 'vision',
+              });
+
+              fileIds.push(file.id);
+            }
+          }
+
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                error: 'gpt-image-1 model only returns Base64 format. URL format is not supported.',
-                note: 'This implementation only supports URL format images. Base64 is not supported.',
-              }),
-            }],
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  file_ids: fileIds,
+                  count: fileIds.length,
+                  note: 'Images have been uploaded and are available via file IDs',
+                }),
+              },
+            ],
           };
         } catch (error: any) {
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                error: error.message || 'Image generation failed',
-              }),
-            }],
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: error.message || 'Image generation failed',
+                }),
+              },
+            ],
           };
         }
       }
 
       case 'get_version': {
         return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              version: version,
-            }),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                version: version,
+              }),
+            },
+          ],
         };
       }
 
