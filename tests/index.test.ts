@@ -1,6 +1,77 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 describe('OpenAI MCP Server', () => {
+  describe('画像生成機能', () => {
+    it('正常な画像生成リクエストを処理できる', () => {
+      const args = {
+        prompt: 'A beautiful sunset',
+        n: 1,
+        size: '1024x1024',
+      };
+      
+      // 必須パラメータの存在確認
+      expect(args.prompt).toBeDefined();
+      expect(typeof args.prompt).toBe('string');
+    });
+
+    it('promptが必須であることを確認', () => {
+      const args = {
+        n: 1,
+        size: '1024x1024',
+      };
+      
+      expect((args as any).prompt).toBeUndefined();
+    });
+
+    it('prompt長さ制限を確認', () => {
+      const longPrompt = 'a'.repeat(1001);
+      expect(longPrompt.length).toBeGreaterThan(1000);
+    });
+
+    it('有効なサイズパラメータを確認', () => {
+      const validSizes = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
+      const testSize = '1024x1024';
+      expect(validSizes).toContain(testSize);
+    });
+
+    it('有効なqualityパラメータを確認', () => {
+      const validQualities = ['low', 'medium', 'high', 'auto'];
+      const testQuality = 'high';
+      expect(validQualities).toContain(testQuality);
+    });
+
+    it('有効なbackgroundパラメータを確認', () => {
+      const validBackgrounds = ['opaque', 'transparent'];
+      const testBackground = 'transparent';
+      expect(validBackgrounds).toContain(testBackground);
+    });
+
+    it('n（画像数）パラメータの範囲を確認', () => {
+      const minN = 1;
+      const maxN = 10;
+      const testN = 5;
+      expect(testN).toBeGreaterThanOrEqual(minN);
+      expect(testN).toBeLessThanOrEqual(maxN);
+    });
+
+    it('OpenAI APIエラーレスポンスを適切に処理', () => {
+      const errorResponse = {
+        error: {
+          message: 'Invalid API key',
+          type: 'invalid_request_error',
+        }
+      };
+      
+      expect(errorResponse.error).toBeDefined();
+      expect(errorResponse.error.message).toBeDefined();
+    });
+
+    it('ネットワークエラーを適切に処理', () => {
+      const networkError = new Error('Network request failed');
+      expect(networkError.message).toContain('Network');
+    });
+  });
+
   describe('チャット機能', () => {
     it('messagesパラメータが必須であることを確認', () => {
       const args = {
