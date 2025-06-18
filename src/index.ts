@@ -2,39 +2,27 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import OpenAI from 'openai';
 import dotenv from 'dotenv';
-import { ErrorCode, MCPError, mapOpenAIErrorToMCPError, isOpenAIError } from './errors.js';
-import { DependencyContainer } from './container/dependency-container.js';
-import { ToolExecutionContext } from './interfaces.js';
 
 dotenv.config();
 
-// 依存性注入コンテナを初期化
-const container = new DependencyContainer();
-
-// 依存関係を取得
-let logger: ReturnType<typeof container.getLogger>;
-let config: ReturnType<typeof container.getConfigManager>;
-let openaiClient: ReturnType<typeof container.getOpenAIClient>;
-let cacheService: ReturnType<typeof container.getCacheService>;
-
-try {
-  logger = container.getLogger();
-  config = container.getConfigManager();
-  openaiClient = container.getOpenAIClient();
-  cacheService = container.getCacheService();
-} catch (error) {
-  // 初期化エラー時の対応
-  console.error('Failed to initialize dependencies:', error);
+// OpenAI API キーの確認
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) {
+  console.error('Error: OPENAI_API_KEY environment variable is required');
   process.exit(1);
 }
 
-const serverConfig = config.get('server') as any;
+// OpenAIクライアントの初期化
+const openai = new OpenAI({ apiKey });
+
+// サーバーの初期化
 const server = new Server(
   {
-    name: serverConfig.name,
-    version: serverConfig.version,
-    description: serverConfig.description,
+    name: 'openai-mcp-server',
+    version: '0.1.0',
+    description: 'A simple MCP server for OpenAI API integration',
   },
   {
     capabilities: {
@@ -43,39 +31,35 @@ const server = new Server(
   }
 );
 
+// ツール一覧のハンドラー
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
         name: 'chat_completion',
         description:
-          'Generate text responses using OpenAI ChatGPT models. **IMPORTANT: This tool should ONLY be used when users explicitly include trigger phrases in their request.** REQUIRED TRIGGER PHRASES: "Ask ChatGPT:", "GPT:", "OpenAI:", "Hey ChatGPT!", or "Use OpenAI to". Do NOT use this tool for general questions without these explicit triggers. This tool enables conversations, content creation, translation, summarization, and advanced reasoning tasks using GPT-4o, GPT-4, or GPT-3.5-turbo models.',
+          'Generate text responses using OpenAI ChatGPT models. **IMPORTANT: This tool should ONLY be used when users explicitly include trigger phrases in their request.** REQUIRED TRIGGER PHRASES: "Ask ChatGPT:", "GPT:", "OpenAI:", "Hey ChatGPT!", or "Use OpenAI to". Do NOT use this tool for general questions without these explicit triggers.',
         inputSchema: {
           type: 'object',
           properties: {
             model: {
               type: 'string',
               description:
-                'OpenAI model to use for text generation. Choose "gpt-4.1" for best coding and long-context support, "gpt-4.1-mini" for faster performance at lower cost, "gpt-4.1-nano" for fastest/cheapest option, "gpt-4o" for previous generation, "o1" for initial reasoning model, "o1-pro" for advanced reasoning capabilities, "o3" for most advanced reasoning, "o4-mini" for efficient reasoning with tools support. Default is "gpt-4.1".',
+                'OpenAI model to use. Choose "gpt-4.1" for best coding, "gpt-4.1-mini" for faster/cheaper, "o1" for reasoning, "o3" for advanced reasoning. Default is "gpt-4.1".',
               default: 'gpt-4.1',
             },
             messages: {
               type: 'array',
-              description:
-                'Conversation history as an array of message objects. Each message must have a "role" (system/user/assistant) and "content" (the actual text). System messages set behavior, user messages are inputs, assistant messages are previous AI responses. Maintain conversation context by including relevant prior messages.',
+              description: 'Conversation history as message objects with role and content.',
               items: {
                 type: 'object',
                 properties: {
                   role: {
                     type: 'string',
                     enum: ['system', 'user', 'assistant'],
-                    description:
-                      'Role of the message sender: "system" for instructions/context, "user" for human input, "assistant" for AI responses',
                   },
                   content: {
                     type: 'string',
-                    description:
-                      'The actual text content of the message. For system messages, provide instructions or context. For user messages, include the question or prompt. For assistant messages, include previous AI responses.',
                   },
                 },
                 required: ['role', 'content'],
@@ -83,16 +67,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             temperature: {
               type: 'number',
-              description:
-                'Controls randomness in the response (0.0 to 2.0). Lower values (0.0-0.3) produce more focused, deterministic outputs ideal for factual questions. Medium values (0.4-0.8) balance creativity and consistency. Higher values (0.9-2.0) increase creativity and randomness for creative writing tasks. Default: 0.7',
+              description: 'Controls randomness (0.0-2.0). Default: 0.7',
               default: 0.7,
               minimum: 0,
               maximum: 2,
             },
             max_tokens: {
               type: 'number',
-              description:
-                'Maximum number of tokens (words/word pieces) to generate in the response. Controls response length. Typical values: 100-300 for short answers, 500-1000 for medium responses, 1500+ for long-form content. Note: actual response may be shorter if the model naturally concludes. Default: 1000',
+              description: 'Maximum tokens to generate. Default: 1000',
               default: 1000,
             },
           },
@@ -102,7 +84,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'list_models',
         description:
-          'Retrieve a comprehensive list of all available OpenAI language models. **IMPORTANT: This tool should ONLY be used when users explicitly request model information.** REQUIRED TRIGGER PHRASES: "What OpenAI models are available?", "List GPT models", "Show me OpenAI models", "Which ChatGPT models can I use?", or similar explicit model listing requests. Do NOT use this tool unless the user specifically asks about available models.',
+          'Retrieve available OpenAI models. **IMPORTANT: Use only when explicitly requested.** REQUIRED TRIGGER PHRASES: "What OpenAI models", "List GPT models", "Show OpenAI models".',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -112,173 +94,130 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
+// ツール実行のハンドラー
 server.setRequestHandler(CallToolRequestSchema, async request => {
   const { name, arguments: args } = request.params;
-  const requestId = logger.generateRequestId();
-  const startTime = Date.now();
-
-  logger.toolRequest(name, requestId, args);
 
   try {
-    // ツールハンドラーを取得
-    const toolHandler = container.getToolHandler(name);
-    if (!toolHandler) {
-      throw new MCPError(ErrorCode.UNKNOWN_TOOL, `Unknown tool: ${name}`, { toolName: name });
+    switch (name) {
+      case 'chat_completion': {
+        // 引数の検証
+        if (!args || !args.messages || !Array.isArray(args.messages)) {
+          return {
+            error: {
+              code: 'INVALID_ARGUMENTS',
+              message: 'messages array is required',
+            },
+          };
+        }
+
+        // APIリクエスト
+        const completion = await openai.chat.completions.create({
+          model: args.model || 'gpt-4.1',
+          messages: args.messages,
+          temperature: args.temperature ?? 0.7,
+          max_tokens: args.max_tokens ?? 1000,
+        } as any);
+
+        return {
+          result: {
+            content: completion.choices[0]?.message?.content || '',
+            usage: completion.usage,
+            model: completion.model,
+          },
+        };
+      }
+
+      case 'list_models': {
+        // モデル一覧を取得
+        const modelsResponse = await openai.models.list();
+
+        // ChatGPT関連モデルのみフィルタリング
+        const chatModels = modelsResponse.data
+          .filter(
+            model =>
+              model.id.includes('gpt') ||
+              model.id.includes('o1') ||
+              model.id.includes('o3') ||
+              model.id.includes('o4')
+          )
+          .map(model => ({
+            id: model.id,
+            created: new Date(model.created * 1000).toISOString(),
+            owned_by: model.owned_by,
+          }));
+
+        return {
+          result: {
+            models: chatModels,
+            count: chatModels.length,
+          },
+        };
+      }
+
+      default:
+        return {
+          error: {
+            code: 'UNKNOWN_TOOL',
+            message: `Unknown tool: ${name}`,
+          },
+        };
     }
-
-    // ツール実行コンテキストを構築
-    const context: ToolExecutionContext = {
-      openaiClient,
-      logger,
-      config,
-      environmentProvider: container.getEnvironmentProvider(),
-      cacheService,
-    };
-
-    // ツールを実行
-    const result = await toolHandler.execute(args, context);
-
-    logger.toolResponse(name, requestId, true, Date.now() - startTime, {
-      model: result.model,
-      tokenUsage: result.usage
-        ? {
-            prompt: result.usage.prompt_tokens,
-            completion: result.usage.completion_tokens,
-            total: result.usage.total_tokens,
-          }
-        : undefined,
-    });
-
-    return { result };
-  } catch (error) {
-    const duration = Date.now() - startTime;
-
-    // Enhanced error handling
-    if (isOpenAIError(error)) {
-      const mcpError = mapOpenAIErrorToMCPError(error as any);
-      logger.openaiError(requestId, name, error as Error, mcpError.statusCode, duration);
-      logger.toolResponse(name, requestId, false, duration);
+  } catch (error: any) {
+    // OpenAI APIエラーのハンドリング
+    if (error?.status) {
+      const statusMessages: Record<number, string> = {
+        401: 'Invalid API key',
+        429: 'Rate limit exceeded',
+        500: 'OpenAI API error',
+        503: 'OpenAI service unavailable',
+      };
 
       return {
         error: {
-          code: mcpError.code,
-          message: mcpError.message,
+          code: `OPENAI_ERROR_${error.status}`,
+          message: statusMessages[error.status] || error.message || 'OpenAI API error',
         },
       };
     }
 
-    if (error instanceof MCPError) {
-      logger.error('MCP error occurred', {
-        requestId,
-        toolName: name,
-        duration,
-        ...error.toJSON(),
-      });
-
-      logger.toolResponse(name, requestId, false, duration);
-
-      return {
-        error: {
-          code: error.code,
-          message: error.message,
-        },
-      };
-    }
-
-    if (error instanceof Error) {
-      logger.error('Tool request failed', {
-        requestId,
-        toolName: name,
-        duration,
-        error: {
-          code: 'TOOL_ERROR',
-          message: error.message,
-          stack: error.stack,
-        },
-      });
-
-      logger.toolResponse(name, requestId, false, duration, {
-        error: {
-          code: 'TOOL_ERROR',
-          message: error.message,
-        },
-      });
-
-      return {
-        error: {
-          code: 'TOOL_ERROR',
-          message: error.message,
-        },
-      };
-    }
-
-    logger.error('Unknown error occurred', {
-      requestId,
-      toolName: name,
-      duration,
-    });
-
-    logger.toolResponse(name, requestId, false, duration);
-
+    // その他のエラー
     return {
       error: {
-        code: 'UNKNOWN_ERROR',
-        message: 'An unknown error occurred',
+        code: 'TOOL_ERROR',
+        message: error.message || 'An error occurred',
       },
     };
   }
 });
 
+// サーバーの起動
 async function main() {
-  const envProvider = container.getEnvironmentProvider();
-
-  logger.info('Starting OpenAI MCP Server', {
-    version: process.env.npm_package_version || '0.1.0',
-    nodeVersion: process.version,
-    logLevel: envProvider.get('LOG_LEVEL') || 'info',
-    args: {
-      environment: envProvider.get('NODE_ENV') || 'development',
-    },
-  });
+  console.error('Starting OpenAI MCP Server...');
 
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
 
-    logger.info('OpenAI MCP Server started successfully');
-    console.error('OpenAI MCP Server is running...');
+    console.error('OpenAI MCP Server is running');
   } catch (error) {
-    logger.error('Failed to start server', {
-      error: {
-        code: 'STARTUP_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      },
-    });
-    throw error;
+    console.error('Failed to start server:', error);
+    process.exit(1);
   }
 }
 
+// グレースフルシャットダウン
 process.on('SIGINT', () => {
-  logger.info('Received SIGINT, shutting down gracefully');
-  cacheService.dispose();
+  console.error('Shutting down...');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  logger.info('Received SIGTERM, shutting down gracefully');
-  cacheService.dispose();
+  console.error('Shutting down...');
   process.exit(0);
 });
 
 main().catch(error => {
-  logger.error('Server startup failed', {
-    error: {
-      code: 'STARTUP_FAILURE',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-    },
-  });
-  console.error('Failed to start server:', error);
+  console.error('Server startup failed:', error);
   process.exit(1);
 });
