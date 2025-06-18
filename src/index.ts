@@ -24,10 +24,17 @@ const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'
 const openai = new OpenAI({ apiKey });
 
 // MCPサーバー
-const server = new Server({
-  name: packageJson.name,
-  version: packageJson.version,
-});
+const server = new Server(
+  {
+    name: packageJson.name,
+    version: packageJson.version,
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
 
 // ツール定義
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
