@@ -4,6 +4,7 @@ import type {
   ModelsPage, 
   ChatCompletionCreateParamsNonStreaming 
 } from 'openai/resources/index.js';
+import type { ImagesResponse, ImageGenerateParams } from 'openai/resources/images.js';
 
 /**
  * OpenAI クライアントのモック実装
@@ -14,11 +15,13 @@ export class MockOpenAIClient implements IOpenAIClient {
   private mockError: Error | null = null;
   private mockChatResponse: ChatCompletion | null = null;
   private mockModelsResponse: ModelsPage | null = null;
+  private mockImagesResponse: ImagesResponse | null = null;
 
   constructor() {
     // デフォルトのモックレスポンス
     this.mockChatResponse = this.createDefaultChatResponse();
     this.mockModelsResponse = this.createDefaultModelsResponse();
+    this.mockImagesResponse = this.createDefaultImagesResponse();
   }
 
   // モック設定メソッド
@@ -37,11 +40,17 @@ export class MockOpenAIClient implements IOpenAIClient {
     this.shouldThrowError = false;
   }
 
+  setImagesResponse(response: ImagesResponse): void {
+    this.mockImagesResponse = response;
+    this.shouldThrowError = false;
+  }
+
   reset(): void {
     this.shouldThrowError = false;
     this.mockError = null;
     this.mockChatResponse = this.createDefaultChatResponse();
     this.mockModelsResponse = this.createDefaultModelsResponse();
+    this.mockImagesResponse = this.createDefaultImagesResponse();
   }
 
   // インターフェース実装
@@ -78,6 +87,22 @@ export class MockOpenAIClient implements IOpenAIClient {
         }
         
         return this.mockModelsResponse;
+      },
+    };
+  }
+
+  get images() {
+    return {
+      generate: async (params: ImageGenerateParams): Promise<ImagesResponse> => {
+        if (this.shouldThrowError && this.mockError) {
+          throw this.mockError;
+        }
+        
+        if (!this.mockImagesResponse) {
+          throw new Error('No mock images response set');
+        }
+        
+        return this.mockImagesResponse;
       },
     };
   }
@@ -165,5 +190,17 @@ export class MockOpenAIClient implements IOpenAIClient {
       ],
     } as ModelsPage;
     return mockPage;
+  }
+
+  private createDefaultImagesResponse(): ImagesResponse {
+    return {
+      created: Math.floor(Date.now() / 1000),
+      data: [
+        {
+          url: 'https://example.com/generated-image-1.png',
+          revised_prompt: 'A beautiful landscape with mountains and a lake',
+        },
+      ],
+    };
   }
 }

@@ -4,6 +4,7 @@ import type {
   ChatCompletion,
   ModelsPage,
 } from 'openai/resources/index.js';
+import type { ImagesResponse, ImageGenerateParams } from 'openai/resources/images.js';
 import { IOpenAIClient } from '../interfaces.js';
 
 /**
@@ -34,6 +35,14 @@ export class OpenAIAdapter implements IOpenAIClient {
     return {
       list: (): Promise<ModelsPage> => {
         return this.client.models.list();
+      },
+    };
+  }
+
+  get images() {
+    return {
+      generate: (params: ImageGenerateParams): Promise<ImagesResponse> => {
+        return this.client.images.generate(params);
       },
     };
   }

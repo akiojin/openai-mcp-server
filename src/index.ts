@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import { ImageGenerationTool } from './tools/image-generation-tool.js';
 
 dotenv.config();
 
@@ -16,6 +17,9 @@ if (!apiKey) {
 
 // OpenAIクライアントの初期化
 const openai = new OpenAI({ apiKey });
+
+// ツールの初期化
+const imageGenerationTool = new ImageGenerationTool(openai);
 
 // サーバーの初期化
 const server = new Server(
@@ -152,10 +156,22 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         // 引数の検証
         if (!args || !args.messages || !Array.isArray(args.messages)) {
           return {
-            error: {
-              code: 'INVALID_ARGUMENTS',
-              message: 'messages array is required',
-            },
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    error: {
+                      code: 'INVALID_ARGUMENTS',
+                      message: 'messages array is required',
+                    },
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+            isError: true,
           };
         }
 
@@ -167,12 +183,22 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           max_tokens: args.max_tokens ?? 1000,
         } as any);
 
+        // MCPが期待する形式に変換
         return {
-          result: {
-            content: completion.choices[0]?.message?.content || '',
-            usage: completion.usage,
-            model: completion.model,
-          },
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  content: completion.choices[0]?.message?.content || '',
+                  usage: completion.usage,
+                  model: completion.model,
+                },
+                null,
+                2
+              ),
+            },
+          ],
         };
       }
 
@@ -195,72 +221,105 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             owned_by: model.owned_by,
           }));
 
+        // MCPが期待する形式に変換
         return {
-          result: {
-            models: chatModels,
-            count: chatModels.length,
-          },
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  models: chatModels,
+                  count: chatModels.length,
+                },
+                null,
+                2
+              ),
+            },
+          ],
         };
       }
 
       case 'generate_image': {
-        // 引数の検証
-        if (!args || !args.prompt) {
+        try {
+          // 引数の検証
+          if (!args || !args.prompt) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      error: {
+                        code: 'INVALID_ARGUMENTS',
+                        message: 'prompt is required',
+                      },
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          const result = await imageGenerationTool.execute(args as any);
+
+          // MCPが期待する形式に変換
           return {
-            error: {
-              code: 'INVALID_ARGUMENTS',
-              message: 'prompt is required',
-            },
+            content: result.images.map(image => ({
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  url: image.url,
+                  revised_prompt: image.revised_prompt,
+                  created: result.created,
+                },
+                null,
+                2
+              ),
+            })),
+          };
+        } catch (error: any) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    error: {
+                      code: 'INVALID_ARGUMENTS',
+                      message: error.message,
+                    },
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+            isError: true,
           };
         }
-
-        // プロンプトの長さチェック
-        if (typeof args.prompt === 'string' && args.prompt.length > 1000) {
-          return {
-            error: {
-              code: 'INVALID_ARGUMENTS',
-              message: 'prompt must be 1000 characters or less',
-            },
-          };
-        }
-
-        // 画像生成パラメータ
-        const imageParams: any = {
-          model: args.model || 'gpt-image-1',
-          prompt: args.prompt,
-          n: args.n || 1,
-          size: args.size || '1024x1024',
-        };
-
-        // オプションパラメータ
-        if (args.quality) {
-          imageParams.quality = args.quality;
-        }
-        if (args.style) {
-          imageParams.style = args.style;
-        }
-
-        // 画像生成APIを呼び出し
-        const response = await openai.images.generate(imageParams);
-
-        return {
-          result: {
-            images:
-              response.data?.map(image => ({
-                url: image.url,
-                revised_prompt: image.revised_prompt,
-              })) || [],
-            created: new Date().toISOString(),
-          },
-        };
       }
 
       default:
         return {
-          error: {
-            code: 'UNKNOWN_TOOL',
-            message: `Unknown tool: ${name}`,
-          },
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  error: {
+                    code: 'UNKNOWN_TOOL',
+                    message: `Unknown tool: ${name}`,
+                  },
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
         };
     }
   } catch (error: any) {
@@ -274,19 +333,43 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
       };
 
       return {
-        error: {
-          code: `OPENAI_ERROR_${error.status}`,
-          message: statusMessages[error.status] || error.message || 'OpenAI API error',
-        },
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: {
+                  code: `OPENAI_ERROR_${error.status}`,
+                  message: statusMessages[error.status] || error.message || 'OpenAI API error',
+                },
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: true,
       };
     }
 
     // その他のエラー
     return {
-      error: {
-        code: 'TOOL_ERROR',
-        message: error.message || 'An error occurred',
-      },
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              error: {
+                code: 'TOOL_ERROR',
+                message: error.message || 'An error occurred',
+              },
+            },
+            null,
+            2
+          ),
+        },
+      ],
+      isError: true,
     };
   }
 });
