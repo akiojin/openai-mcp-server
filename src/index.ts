@@ -3,214 +3,151 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import OpenAI from 'openai';
-import dotenv from 'dotenv';
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 
-interface ImageGenerationRequest {
-  prompt: string;
-  model?: string;
-  n?: number;
-  size?: string;
-  quality?: string;
-  background?: string;
-  [key: string]: unknown;
-}
-
-interface ImageGenerationResponse {
-  data: Array<{ b64_json?: string }>;
-}
-
-interface OpenAIErrorResponse {
-  error?: {
-    message?: string;
-    type?: string;
-    code?: string;
-  };
-}
-
-// package.jsonからバージョン情報を読み込む
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
-const version = packageJson.version;
-
-dotenv.config();
-
-// OpenAI API キーの確認
+// 環境変数チェック
 const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) {
   console.error('Error: OPENAI_API_KEY environment variable is required');
   process.exit(1);
 }
 
-// OpenAIクライアントの初期化
+// バージョン情報
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
+
+// OpenAIクライアント
 const openai = new OpenAI({ apiKey });
 
-// サーバーの初期化
-const server = new Server(
-  {
-    name: 'openai-mcp-server',
-    version: version,
-    description: 'A simple MCP server for OpenAI API integration',
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  }
-);
-
-// ツール一覧のハンドラー
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: 'chat_completion',
-        description:
-          'Generate text responses using OpenAI ChatGPT models. **IMPORTANT: This tool should ONLY be used when users explicitly include trigger phrases in their request.** REQUIRED TRIGGER PHRASES: "Ask ChatGPT:", "GPT:", "OpenAI:", "Hey ChatGPT!", or "Use OpenAI to". Do NOT use this tool for general questions without these explicit triggers.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            model: {
-              type: 'string',
-              description:
-                'OpenAI model to use. Choose "gpt-4.1" for best coding, "gpt-4.1-mini" for faster/cheaper, "o1" for reasoning, "o3" for advanced reasoning. Default is "gpt-4.1".',
-              default: 'gpt-4.1',
-            },
-            messages: {
-              type: 'array',
-              description: 'Conversation history as message objects with role and content.',
-              items: {
-                type: 'object',
-                properties: {
-                  role: {
-                    type: 'string',
-                    enum: ['system', 'user', 'assistant'],
-                  },
-                  content: {
-                    type: 'string',
-                  },
-                },
-                required: ['role', 'content'],
-              },
-            },
-            temperature: {
-              type: 'number',
-              description: 'Controls randomness (0.0-2.0). Default: 0.7',
-              default: 0.7,
-              minimum: 0,
-              maximum: 2,
-            },
-            max_tokens: {
-              type: 'number',
-              description: 'Maximum tokens to generate. Default: 1000',
-              default: 1000,
-            },
-          },
-          required: ['messages'],
-        },
-      },
-      {
-        name: 'list_models',
-        description:
-          'Retrieve available OpenAI models. **IMPORTANT: Use only when explicitly requested.** REQUIRED TRIGGER PHRASES: "What OpenAI models", "List GPT models", "Show OpenAI models".',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-      {
-        name: 'generate_image',
-        description:
-          'Generate images using gpt-image-1 model. Returns file paths for generated images saved in temporary directory. REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            prompt: {
-              type: 'string',
-              description:
-                'A text description of the desired image(s). Maximum length is 1000 characters.',
-            },
-            model: {
-              type: 'string',
-              description: 'The model to use for image generation. Default is "gpt-image-1".',
-              default: 'gpt-image-1',
-            },
-            n: {
-              type: 'number',
-              description: 'Number of images to generate. Must be between 1 and 10. Default is 1.',
-              default: 1,
-              minimum: 1,
-              maximum: 10,
-            },
-            size: {
-              type: 'string',
-              description:
-                'Size of the generated images. Must be one of "1024x1024", "1024x1536", "1536x1024", or "auto". Default is "1024x1024".',
-              default: '1024x1024',
-              enum: ['1024x1024', '1024x1536', '1536x1024', 'auto'],
-            },
-            quality: {
-              type: 'string',
-              description:
-                'Quality of the image. "low", "medium", "high", or "auto". Default is "auto".',
-              default: 'auto',
-              enum: ['low', 'medium', 'high', 'auto'],
-            },
-            background: {
-              type: 'string',
-              description: 'Background type. "opaque" or "transparent". Default is "opaque".',
-              default: 'opaque',
-              enum: ['opaque', 'transparent'],
-            },
-          },
-          required: ['prompt'],
-        },
-      },
-      {
-        name: 'get_version',
-        description: 'Get the version number of this MCP server.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-    ],
-  };
+// MCPサーバー
+const server = new Server({
+  name: packageJson.name,
+  version: packageJson.version,
 });
 
-// ツール実行のハンドラー
+// ツール定義
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: [
+    {
+      name: 'chat_completion',
+      description: 'Generate text responses using OpenAI ChatGPT models',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          messages: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                role: { type: 'string', enum: ['system', 'user', 'assistant'] },
+                content: { type: 'string' },
+              },
+              required: ['role', 'content'],
+            },
+            description: 'Conversation history as message objects',
+          },
+          model: {
+            type: 'string',
+            description: 'OpenAI model to use',
+            default: 'gpt-4.1',
+          },
+          temperature: {
+            type: 'number',
+            description: 'Controls randomness (0.0-2.0)',
+            default: 0.7,
+          },
+          max_tokens: {
+            type: 'number',
+            description: 'Maximum tokens to generate',
+            default: 1000,
+          },
+        },
+        required: ['messages'],
+      },
+    },
+    {
+      name: 'list_models',
+      description: 'Retrieve available OpenAI models',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
+    {
+      name: 'generate_image',
+      description: 'Generate images using gpt-image-1 model',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          prompt: {
+            type: 'string',
+            description: 'A text description of the desired image(s)',
+          },
+          model: {
+            type: 'string',
+            description: 'The model to use for image generation',
+            default: 'gpt-image-1',
+          },
+          n: {
+            type: 'number',
+            description: 'Number of images to generate (1-10)',
+            default: 1,
+          },
+          size: {
+            type: 'string',
+            description: 'Size of the generated images',
+            default: '1024x1024',
+            enum: ['1024x1024', '1024x1536', '1536x1024', 'auto'],
+          },
+          quality: {
+            type: 'string',
+            description: 'Quality of the image',
+            default: 'auto',
+            enum: ['low', 'medium', 'high', 'auto'],
+          },
+          background: {
+            type: 'string',
+            description: 'Background type',
+            default: 'opaque',
+            enum: ['opaque', 'transparent'],
+          },
+        },
+        required: ['prompt'],
+      },
+    },
+    {
+      name: 'get_version',
+      description: 'Get the version number of this MCP server',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  ],
+}));
+
+// ツール実行
 server.setRequestHandler(CallToolRequestSchema, async request => {
   const { name, arguments: args } = request.params;
 
   try {
     switch (name) {
       case 'chat_completion': {
-        const chatArgs = args as {
-          messages?: unknown;
-          model?: string;
-          temperature?: number;
-          max_tokens?: number;
-        };
-        // 引数の検証
-        if (!chatArgs || !chatArgs.messages || !Array.isArray(chatArgs.messages)) {
+        if (!args?.messages || !Array.isArray(args.messages)) {
           return {
-            error: {
-              code: 'INVALID_ARGUMENTS',
-              message: 'messages array is required',
-            },
+            error: { code: 'INVALID_ARGUMENTS', message: 'messages array is required' },
           };
         }
 
-        // APIリクエスト
         const completion = await openai.chat.completions.create({
-          model: chatArgs.model || 'gpt-4.1',
-          messages: chatArgs.messages,
-          temperature: chatArgs.temperature ?? 0.7,
-          max_tokens: chatArgs.max_tokens ?? 1000,
+          model: (args.model as string) || 'gpt-4.1',
+          messages: args.messages as any[],
+          temperature: (args.temperature as number) ?? 0.7,
+          max_tokens: (args.max_tokens as number) ?? 1000,
         });
 
         return {
@@ -228,10 +165,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
       }
 
       case 'list_models': {
-        // モデル一覧を取得
         const modelsResponse = await openai.models.list();
-
-        // ChatGPT関連モデルのみフィルタリング
         const chatModels = modelsResponse.data
           .filter(
             model =>
@@ -250,98 +184,56 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                models: chatModels,
-                count: chatModels.length,
-              }),
+              text: JSON.stringify({ models: chatModels, count: chatModels.length }),
             },
           ],
         };
       }
 
       case 'generate_image': {
-        const imageArgs = args as {
-          prompt?: string;
-          model?: string;
-          n?: number;
-          size?: string;
-          quality?: string;
-          background?: string;
-        };
-        // 引数の検証
-        if (!imageArgs || !imageArgs.prompt) {
+        if (!args?.prompt) {
           return {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({
-                  error: 'prompt is required',
-                }),
+                text: JSON.stringify({ error: 'prompt is required' }),
               },
             ],
           };
         }
 
         try {
-          // 直接HTTPリクエストでOpenAI APIを呼び出す
-          const url = 'https://api.openai.com/v1/images/generations';
-          const requestBody: ImageGenerationRequest = {
-            prompt: imageArgs.prompt,
-            model: imageArgs.model || 'gpt-image-1',
-            n: imageArgs.n || 1,
-            size: imageArgs.size || '1024x1024',
-          };
-
-          // オプションパラメータ
-          if (imageArgs.quality) {
-            requestBody.quality = imageArgs.quality;
-          }
-
-          // backgroundパラメータがある合は追加
-          if (imageArgs.background) {
-            requestBody.background = imageArgs.background;
-          }
-
-          const response = await fetch(url, {
+          const response = await fetch('https://api.openai.com/v1/images/generations', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${apiKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify({
+              prompt: args.prompt,
+              model: args.model || 'gpt-image-1',
+              n: args.n || 1,
+              size: args.size || '1024x1024',
+              quality: args.quality,
+              background: args.background,
+              response_format: 'b64_json',
+            }),
           });
 
           if (!response.ok) {
-            const errorData = (await response.json()) as OpenAIErrorResponse;
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify({
-                    error: errorData.error?.message || 'Image generation failed',
-                  }),
-                },
-              ],
-            };
+            const errorData = (await response.json()) as any;
+            throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
           }
 
-          const data = (await response.json()) as ImageGenerationResponse;
-
-          // Base64形式の画像をテンポラリファイルに保存
-          const filePaths: string[] = [];
-          const images = data.data || [];
+          const data = (await response.json()) as any;
+          const filePaths = [];
           const timestamp = Date.now();
 
-          for (let i = 0; i < images.length; i++) {
-            const imageData = images[i];
-            if (imageData.b64_json) {
-              // Base64をBufferに変換
-              const buffer = Buffer.from(imageData.b64_json, 'base64');
-
-              // テンポラリディレクトリにファイルを保存
+          for (let i = 0; i < data.data.length; i++) {
+            if (data.data[i].b64_json) {
+              const buffer = Buffer.from(data.data[i].b64_json, 'base64');
               const fileName = `openai_generated_image_${timestamp}_${i + 1}.png`;
               const filePath = join(tmpdir(), fileName);
-
               writeFileSync(filePath, buffer);
               filePaths.push(filePath);
             }
@@ -351,10 +243,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({
-                  file_paths: filePaths,
-                  count: filePaths.length,
-                }),
+                text: JSON.stringify({ file_paths: filePaths, count: filePaths.length }),
               },
             ],
           };
@@ -378,7 +267,9 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             {
               type: 'text',
               text: JSON.stringify({
-                version: version,
+                version: packageJson.version,
+                name: packageJson.name,
+                description: packageJson.description,
               }),
             },
           ],
@@ -387,14 +278,10 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
       default:
         return {
-          error: {
-            code: 'UNKNOWN_TOOL',
-            message: `Unknown tool: ${name}`,
-          },
+          error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${name}` },
         };
     }
   } catch (error) {
-    // OpenAI APIエラーのハンドリング
     if (
       error &&
       typeof error === 'object' &&
@@ -407,21 +294,14 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         500: 'OpenAI API error',
         503: 'OpenAI service unavailable',
       };
-
-      const errorMessage =
-        'message' in error && typeof error.message === 'string'
-          ? error.message
-          : 'OpenAI API error';
-
       return {
         error: {
           code: `OPENAI_ERROR_${error.status}`,
-          message: statusMessages[error.status] || errorMessage,
+          message: statusMessages[error.status] || 'OpenAI API error',
         },
       };
     }
 
-    // その他のエラー
     return {
       error: {
         code: 'TOOL_ERROR',
@@ -431,33 +311,15 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
   }
 });
 
-// サーバーの起動
+// サーバー起動
 async function main() {
   console.error('Starting OpenAI MCP Server...');
-
-  try {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-
-    console.error('OpenAI MCP Server is running');
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error('OpenAI MCP Server running');
 }
 
-// グレースフルシャットダウン
-process.on('SIGINT', () => {
-  console.error('Shutting down...');
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  console.error('Shutting down...');
-  process.exit(0);
-});
-
 main().catch(error => {
-  console.error('Server startup failed:', error);
+  console.error('Failed to start server:', error);
   process.exit(1);
 });
