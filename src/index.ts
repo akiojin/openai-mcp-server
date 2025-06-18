@@ -4,9 +4,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { tmpdir } from 'os';
 
 // package.jsonからバージョン情報を読み込む
 const __filename = fileURLToPath(import.meta.url);
@@ -102,7 +103,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'generate_image',
         description:
-          'Generate images using gpt-image-1 model. Returns URLs for generated images. REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
+          'Generate images using gpt-image-1 model. Returns file paths for generated images saved in temporary directory. REQUIRED TRIGGER PHRASES: "Generate image", "Create image", "Draw", "Picture of", "Image of", "GPT-image".',
         inputSchema: {
           type: 'object',
           properties: {
@@ -253,7 +254,6 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             model: args.model || 'gpt-image-1',
             n: args.n || 1,
             size: args.size || '1024x1024',
-            response_format: 'url', // URL形式を明示的に指定
           };
 
           // オプションパラメータ
@@ -291,13 +291,23 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
           const data = (await response.json()) as any;
 
-          // URL形式の画像を返す
-          const urls: string[] = [];
+          // Base64形式の画像をテンポラリファイルに保存
+          const filePaths: string[] = [];
           const images = data.data || [];
+          const timestamp = Date.now();
 
-          for (const imageData of images) {
-            if (imageData.url) {
-              urls.push(imageData.url);
+          for (let i = 0; i < images.length; i++) {
+            const imageData = images[i];
+            if (imageData.b64_json) {
+              // Base64をBufferに変換
+              const buffer = Buffer.from(imageData.b64_json, 'base64');
+
+              // テンポラリディレクトリにファイルを保存
+              const fileName = `openai_generated_image_${timestamp}_${i + 1}.png`;
+              const filePath = join(tmpdir(), fileName);
+
+              writeFileSync(filePath, buffer);
+              filePaths.push(filePath);
             }
           }
 
@@ -306,8 +316,8 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
               {
                 type: 'text',
                 text: JSON.stringify({
-                  urls: urls,
-                  count: urls.length,
+                  file_paths: filePaths,
+                  count: filePaths.length,
                 }),
               },
             ],
