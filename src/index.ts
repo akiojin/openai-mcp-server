@@ -9,6 +9,28 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 
+interface ImageGenerationRequest {
+  prompt: string;
+  model?: string;
+  n?: number;
+  size?: string;
+  quality?: string;
+  background?: string;
+  [key: string]: unknown;
+}
+
+interface ImageGenerationResponse {
+  data: Array<{ b64_json?: string }>;
+}
+
+interface OpenAIErrorResponse {
+  error?: {
+    message?: string;
+    type?: string;
+    code?: string;
+  };
+}
+
 // package.jsonからバージョン情報を読み込む
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -167,8 +189,14 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
   try {
     switch (name) {
       case 'chat_completion': {
+        const chatArgs = args as {
+          messages?: unknown;
+          model?: string;
+          temperature?: number;
+          max_tokens?: number;
+        };
         // 引数の検証
-        if (!args || !args.messages || !Array.isArray(args.messages)) {
+        if (!chatArgs || !chatArgs.messages || !Array.isArray(chatArgs.messages)) {
           return {
             error: {
               code: 'INVALID_ARGUMENTS',
@@ -179,11 +207,11 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
         // APIリクエスト
         const completion = await openai.chat.completions.create({
-          model: args.model || 'gpt-4.1',
-          messages: args.messages,
-          temperature: args.temperature ?? 0.7,
-          max_tokens: args.max_tokens ?? 1000,
-        } as any);
+          model: chatArgs.model || 'gpt-4.1',
+          messages: chatArgs.messages,
+          temperature: chatArgs.temperature ?? 0.7,
+          max_tokens: chatArgs.max_tokens ?? 1000,
+        });
 
         return {
           content: [
@@ -232,8 +260,16 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
       }
 
       case 'generate_image': {
+        const imageArgs = args as {
+          prompt?: string;
+          model?: string;
+          n?: number;
+          size?: string;
+          quality?: string;
+          background?: string;
+        };
         // 引数の検証
-        if (!args || !args.prompt) {
+        if (!imageArgs || !imageArgs.prompt) {
           return {
             content: [
               {
@@ -249,21 +285,21 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         try {
           // 直接HTTPリクエストでOpenAI APIを呼び出す
           const url = 'https://api.openai.com/v1/images/generations';
-          const requestBody: any = {
-            prompt: args.prompt,
-            model: args.model || 'gpt-image-1',
-            n: args.n || 1,
-            size: args.size || '1024x1024',
+          const requestBody: ImageGenerationRequest = {
+            prompt: imageArgs.prompt,
+            model: imageArgs.model || 'gpt-image-1',
+            n: imageArgs.n || 1,
+            size: imageArgs.size || '1024x1024',
           };
 
           // オプションパラメータ
-          if (args.quality) {
-            requestBody.quality = args.quality;
+          if (imageArgs.quality) {
+            requestBody.quality = imageArgs.quality;
           }
 
-          // backgroundパラメータがある場合は追加
-          if (args.background) {
-            (requestBody as any).background = args.background;
+          // backgroundパラメータがある合は追加
+          if (imageArgs.background) {
+            requestBody.background = imageArgs.background;
           }
 
           const response = await fetch(url, {
@@ -276,7 +312,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           });
 
           if (!response.ok) {
-            const errorData = (await response.json()) as any;
+            const errorData = (await response.json()) as OpenAIErrorResponse;
             return {
               content: [
                 {
@@ -289,7 +325,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             };
           }
 
-          const data = (await response.json()) as any;
+          const data = (await response.json()) as ImageGenerationResponse;
 
           // Base64形式の画像をテンポラリファイルに保存
           const filePaths: string[] = [];
@@ -322,13 +358,13 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
               },
             ],
           };
-        } catch (error: any) {
+        } catch (error) {
           return {
             content: [
               {
                 type: 'text',
                 text: JSON.stringify({
-                  error: error.message || 'Image generation failed',
+                  error: error instanceof Error ? error.message : 'Image generation failed',
                 }),
               },
             ],
@@ -357,9 +393,14 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           },
         };
     }
-  } catch (error: any) {
+  } catch (error) {
     // OpenAI APIエラーのハンドリング
-    if (error?.status) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'status' in error &&
+      typeof error.status === 'number'
+    ) {
       const statusMessages: Record<number, string> = {
         401: 'Invalid API key',
         429: 'Rate limit exceeded',
@@ -367,10 +408,15 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         503: 'OpenAI service unavailable',
       };
 
+      const errorMessage =
+        'message' in error && typeof error.message === 'string'
+          ? error.message
+          : 'OpenAI API error';
+
       return {
         error: {
           code: `OPENAI_ERROR_${error.status}`,
-          message: statusMessages[error.status] || error.message || 'OpenAI API error',
+          message: statusMessages[error.status] || errorMessage,
         },
       };
     }
@@ -379,7 +425,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
     return {
       error: {
         code: 'TOOL_ERROR',
-        message: error.message || 'An error occurred',
+        message: error instanceof Error ? error.message : 'An error occurred',
       },
     };
   }

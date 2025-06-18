@@ -3,36 +3,20 @@ import OpenAI from 'openai';
 export enum ErrorCode {
   // Authentication Errors
   AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
-  INVALID_API_KEY = 'INVALID_API_KEY',
 
   // Request Errors
-  INVALID_REQUEST_ERROR = 'INVALID_REQUEST_ERROR',
   INVALID_ARGUMENTS = 'INVALID_ARGUMENTS',
-  MISSING_REQUIRED_FIELD = 'MISSING_REQUIRED_FIELD',
-  INVALID_FIELD_TYPE = 'INVALID_FIELD_TYPE',
-  INVALID_FIELD_VALUE = 'INVALID_FIELD_VALUE',
 
   // Rate Limiting
   RATE_LIMIT_ERROR = 'RATE_LIMIT_ERROR',
-  QUOTA_EXCEEDED = 'QUOTA_EXCEEDED',
 
   // Server Errors
   OPENAI_SERVER_ERROR = 'OPENAI_SERVER_ERROR',
-  INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
-  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
-
-  // Tool Errors
-  TOOL_ERROR = 'TOOL_ERROR',
-  UNKNOWN_TOOL = 'UNKNOWN_TOOL',
 
   // System Errors
-  STARTUP_ERROR = 'STARTUP_ERROR',
-  STARTUP_FAILURE = 'STARTUP_FAILURE',
-  CONFIGURATION_ERROR = 'CONFIGURATION_ERROR',
   ENVIRONMENT_ERROR = 'ENVIRONMENT_ERROR',
 
   // General Errors
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
   OPENAI_API_ERROR = 'OPENAI_API_ERROR',
 }
 
@@ -105,7 +89,11 @@ export class OpenAIServerError extends MCPError {
 }
 
 export function isOpenAIError(error: unknown): error is InstanceType<typeof OpenAI.APIError> {
-  return error instanceof Error && 'status' in error && typeof (error as any).status === 'number';
+  return (
+    error instanceof Error &&
+    'status' in error &&
+    typeof (error as Record<string, unknown>).status === 'number'
+  );
 }
 
 export function mapOpenAIErrorToMCPError(error: InstanceType<typeof OpenAI.APIError>): MCPError {

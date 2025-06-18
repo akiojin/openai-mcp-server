@@ -2,32 +2,42 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { logger } from './logger.js';
 
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+export interface OpenAIConfig {
+  defaultModel: string;
+  defaultTemperature: number;
+  defaultMaxTokens: number;
+  timeout: number;
+  retryAttempts: number;
+  retryDelay: number;
+}
+
+export interface LoggingConfig {
+  level: string;
+  enablePretty: boolean;
+  enableFileLogging: boolean;
+  logFile?: string;
+}
+
+export interface SecurityConfig {
+  enableApiKeyValidation: boolean;
+  enableRateLimiting: boolean;
+  maxRequestsPerMinute: number;
+  enableInputSanitization: boolean;
+}
+
 export interface ServerConfig {
   server: {
     name: string;
     version: string;
     description: string;
   };
-  openai: {
-    defaultModel: string;
-    defaultTemperature: number;
-    defaultMaxTokens: number;
-    timeout: number;
-    retryAttempts: number;
-    retryDelay: number;
-  };
-  logging: {
-    level: string;
-    enablePretty: boolean;
-    enableFileLogging: boolean;
-    logFile?: string;
-  };
-  security: {
-    enableApiKeyValidation: boolean;
-    enableRateLimiting: boolean;
-    maxRequestsPerMinute: number;
-    enableInputSanitization: boolean;
-  };
+  openai: OpenAIConfig;
+  logging: LoggingConfig;
+  security: SecurityConfig;
   performance: {
     enableCaching: boolean;
     cacheExpiry: number;
@@ -116,7 +126,10 @@ export class ConfigManager {
     const envOverrides = this.getEnvironmentOverrides();
 
     // Deep merge: DEFAULT_CONFIG <- loadedConfig <- envOverrides
-    const finalConfig = this.deepMerge(DEFAULT_CONFIG, this.deepMerge(loadedConfig, envOverrides));
+    const finalConfig = this.deepMerge(
+      DEFAULT_CONFIG as unknown as Record<string, unknown>,
+      this.deepMerge(loadedConfig, envOverrides)
+    ) as unknown as ServerConfig;
 
     // Validate configuration
     this.validateConfig(finalConfig);
@@ -128,51 +141,60 @@ export class ConfigManager {
     return finalConfig;
   }
 
-  private getEnvironmentOverrides(): Partial<ServerConfig> {
-    const overrides: Partial<ServerConfig> = {};
+  private getEnvironmentOverrides(): DeepPartial<ServerConfig> {
+    const overrides: DeepPartial<ServerConfig> = {};
 
     // OpenAI settings
+    const openaiOverrides: Partial<OpenAIConfig> = {};
     if (process.env.OPENAI_DEFAULT_MODEL) {
-      if (!overrides.openai) overrides.openai = {};
-      overrides.openai.defaultModel = process.env.OPENAI_DEFAULT_MODEL;
+      openaiOverrides.defaultModel = process.env.OPENAI_DEFAULT_MODEL;
     }
     if (process.env.OPENAI_DEFAULT_TEMPERATURE) {
       const temp = parseFloat(process.env.OPENAI_DEFAULT_TEMPERATURE);
       if (!isNaN(temp)) {
-        if (!overrides.openai) overrides.openai = {};
-        overrides.openai.defaultTemperature = temp;
+        openaiOverrides.defaultTemperature = temp;
       }
     }
     if (process.env.OPENAI_DEFAULT_MAX_TOKENS) {
       const tokens = parseInt(process.env.OPENAI_DEFAULT_MAX_TOKENS, 10);
       if (!isNaN(tokens)) {
-        if (!overrides.openai) overrides.openai = {};
-        overrides.openai.defaultMaxTokens = tokens;
+        openaiOverrides.defaultMaxTokens = tokens;
       }
+    }
+    if (Object.keys(openaiOverrides).length > 0) {
+      overrides.openai = openaiOverrides as Partial<OpenAIConfig>;
     }
 
     // Logging settings
+    const loggingOverrides: Partial<LoggingConfig> = {};
     if (process.env.LOG_LEVEL) {
-      if (!overrides.logging) overrides.logging = {};
-      overrides.logging.level = process.env.LOG_LEVEL;
+      loggingOverrides.level = process.env.LOG_LEVEL;
     }
     if (process.env.LOG_FILE) {
-      if (!overrides.logging) overrides.logging = {};
-      overrides.logging.enableFileLogging = true;
-      overrides.logging.logFile = process.env.LOG_FILE;
+      loggingOverrides.enableFileLogging = true;
+      loggingOverrides.logFile = process.env.LOG_FILE;
+    }
+    if (Object.keys(loggingOverrides).length > 0) {
+      overrides.logging = loggingOverrides as Partial<LoggingConfig>;
     }
 
     // Security settings
+    const securityOverrides: Partial<SecurityConfig> = {};
     if (process.env.ENABLE_RATE_LIMITING) {
-      if (!overrides.security) overrides.security = {};
-      overrides.security.enableRateLimiting = process.env.ENABLE_RATE_LIMITING === 'true';
+      securityOverrides.enableRateLimiting = process.env.ENABLE_RATE_LIMITING === 'true';
+    }
+    if (Object.keys(securityOverrides).length > 0) {
+      overrides.security = securityOverrides as Partial<SecurityConfig>;
     }
 
     return overrides;
   }
 
-  private deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
-    const result = { ...target } as T;
+  private deepMerge(
+    target: Record<string, unknown>,
+    source: Record<string, unknown>
+  ): Record<string, unknown> {
+    const result = { ...target };
 
     for (const key in source) {
       const sourceValue = source[key];
@@ -186,12 +208,12 @@ export class ConfigManager {
         typeof targetValue === 'object' &&
         !Array.isArray(targetValue)
       ) {
-        (result as Record<string, unknown>)[key] = this.deepMerge(
+        result[key] = this.deepMerge(
           targetValue as Record<string, unknown>,
           sourceValue as Record<string, unknown>
         );
       } else if (sourceValue !== undefined) {
-        (result as Record<string, unknown>)[key] = sourceValue;
+        result[key] = sourceValue;
       }
     }
 
@@ -235,8 +257,11 @@ export class ConfigManager {
     return { ...this.config[section] };
   }
 
-  public updateConfig(updates: Partial<ServerConfig>): void {
-    const newConfig = this.deepMerge(this.config, updates);
+  public updateConfig(updates: DeepPartial<ServerConfig>): void {
+    const newConfig = this.deepMerge(
+      this.config as unknown as Record<string, unknown>,
+      updates as Record<string, unknown>
+    ) as unknown as ServerConfig;
     this.validateConfig(newConfig);
     this.config = newConfig;
 
