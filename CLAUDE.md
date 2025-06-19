@@ -34,7 +34,7 @@
 
 ## 技術チェック
 
-- `use github`MCPを使用して、GitHubに関する操作をしてください。
+- `use github`MCPを使用して、GitHubの操作をしてください。
 - `use context7` MCP を使用して、最新のNext.js、Node.js、およびその他のライブラリを確認してください。
 - `use brave-search`MCPウェブ検索を使用して、最新の解決策を検索できます。
 
