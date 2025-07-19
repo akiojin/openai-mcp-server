@@ -97,7 +97,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           model: {
             type: 'string',
             description: 'The model to use for image generation',
-            default: 'dall-e-3',
+            default: 'gpt-image-1',
           },
           n: {
             type: 'number',
@@ -212,7 +212,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         try {
           const response = await openai.images.generate({
             prompt: args.prompt as string,
-            model: (args.model as string) || 'dall-e-3',
+            model: (args.model as string) || 'gpt-image-1',
             n: (args.n as number) || 1,
             size: (args.size as any) || '1024x1024',
             quality: (args.quality as any) || 'standard',
