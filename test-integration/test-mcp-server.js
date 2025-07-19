@@ -117,7 +117,7 @@ class MCPClient {
           this.pendingRequests.delete(id);
           reject(new Error('Request timeout'));
         }
-      }, 10000);
+      }, 90000); // 90秒のタイムアウト（画像生成は最大1分程度かかる）
     });
   }
 
@@ -183,11 +183,14 @@ async function runTests() {
       const content = imageResponse.result?.content?.[0]?.text;
       const imageData = content ? JSON.parse(content) : null;
       
+      console.log('Image generation response:', JSON.stringify(imageData, null, 2));
+      
       if (imageData?.error) {
         logTest('Should generate image without error', false, imageData.error);
       } else {
-        logTest('Should generate image', !!imageData?.file_paths);
-        logTest('Should return file paths', imageData?.file_paths?.length > 0);
+        logTest('Should generate image', !!imageData);
+        logTest('Should return file paths', imageData?.file_paths?.length > 0, 
+          `Got: ${JSON.stringify(imageData)}`)
       }
     } catch (error) {
       logTest('Generate image request', false, error.message);
