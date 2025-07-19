@@ -113,8 +113,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           quality: {
             type: 'string',
             description: 'Quality of the image',
-            default: 'auto',
-            enum: ['low', 'medium', 'high', 'auto'],
+            default: 'standard',
+            enum: ['standard', 'hd'],
           },
           background: {
             type: 'string',
