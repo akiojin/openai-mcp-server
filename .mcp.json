@@ -14,6 +14,10 @@
     "context7": {
       "type": "sse",
       "url": "https://mcp.context7.com/sse"
+    },
+    "openai": {
+      "type": "npx",
+      "url": "."
     }
   }
 }
