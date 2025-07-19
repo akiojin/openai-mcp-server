@@ -1,5 +1,11 @@
 {
   "mcpServers": {
+    "openai": {
+      "command": "npx",
+      "args": [
+        "."
+      ]
+    },
     "brave-search": {
       "type": "stdio",
       "command": "npx",
@@ -14,12 +20,6 @@
     "context7": {
       "type": "sse",
       "url": "https://mcp.context7.com/sse"
-    },
-    "openai": {
-      "command": "npx",
-      "args": [
-        "."
-      ]
     }
   }
 }
