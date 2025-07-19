@@ -39,3 +39,6 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Claude Code export files
+2025-*.txt
