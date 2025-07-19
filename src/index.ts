@@ -113,8 +113,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           quality: {
             type: 'string',
             description: 'Quality of the image',
-            default: 'standard',
-            enum: ['standard', 'hd'],
+            default: 'high',
+            enum: ['low', 'medium', 'high', 'auto'],
           },
           background: {
             type: 'string',
@@ -215,8 +215,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
             model: (args.model as string) || 'gpt-image-1',
             n: (args.n as number) || 1,
             size: (args.size as any) || '1024x1024',
-            quality: (args.quality as any) || 'standard',
-            response_format: 'b64_json',
+            quality: (args.quality as any) || 'high',
           });
 
           const filePaths = [];
@@ -225,8 +224,10 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           if (response.data) {
             for (let i = 0; i < response.data.length; i++) {
               const imageData = response.data[i];
-              if (imageData.b64_json) {
-                const buffer = Buffer.from(imageData.b64_json, 'base64');
+              if (imageData.url) {
+                // URLから画像をダウンロード
+                const imageResponse = await fetch(imageData.url);
+                const buffer = Buffer.from(await imageResponse.arrayBuffer());
                 const fileName = `openai_generated_image_${timestamp}_${i + 1}.png`;
                 const filePath = join(tmpdir(), fileName);
                 writeFileSync(filePath, buffer);

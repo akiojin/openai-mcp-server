@@ -21,6 +21,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:integration": "node test-integration/test-mcp-server.js",
     "prepare": "husky install",
     "release": "semantic-release",
     "release:dry-run": "semantic-release --dry-run",
