@@ -6,20 +6,30 @@
         "."
       ]
     },
-    "brave-search": {
+    "google-search": {
       "type": "stdio",
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-brave-search"
+        "mcp-gemini-google-search"
       ],
-      "env": {
-        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
-      }
+      "env": {}
     },
     "context7": {
       "type": "sse",
       "url": "https://mcp.context7.com/sse"
+    },
+    "markitdown": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "markitdown-mcp"
+      ],
+      "env": {}
+    },
+    "model-hub": {
+      "command": "npx",
+      "args": ["@akiojin/model-hub-mcp"]
     }
   }
 }
