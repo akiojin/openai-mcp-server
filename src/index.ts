@@ -232,6 +232,13 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
                 const filePath = join(tmpdir(), fileName);
                 writeFileSync(filePath, buffer);
                 filePaths.push(filePath);
+              } else if (imageData.b64_json) {
+                // Base64データから画像を保存
+                const buffer = Buffer.from(imageData.b64_json, 'base64');
+                const fileName = `openai_generated_image_${timestamp}_${i + 1}.png`;
+                const filePath = join(tmpdir(), fileName);
+                writeFileSync(filePath, buffer);
+                filePaths.push(filePath);
               }
             }
           }
