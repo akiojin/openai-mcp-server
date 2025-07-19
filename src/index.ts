@@ -97,7 +97,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           model: {
             type: 'string',
             description: 'The model to use for image generation',
-            default: 'gpt-image-1',
+            default: 'dall-e-3',
           },
           n: {
             type: 'number',
@@ -210,39 +210,28 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         }
 
         try {
-          const response = await fetch('https://api.openai.com/v1/images/generations', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              prompt: args.prompt,
-              model: args.model || 'gpt-image-1',
-              n: args.n || 1,
-              size: args.size || '1024x1024',
-              quality: args.quality,
-              background: args.background,
-              response_format: 'b64_json',
-            }),
+          const response = await openai.images.generate({
+            prompt: args.prompt as string,
+            model: (args.model as string) || 'dall-e-3',
+            n: (args.n as number) || 1,
+            size: (args.size as any) || '1024x1024',
+            quality: (args.quality as any) || 'standard',
+            response_format: 'b64_json',
           });
 
-          if (!response.ok) {
-            const errorData = (await response.json()) as any;
-            throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
-          }
-
-          const data = (await response.json()) as any;
           const filePaths = [];
           const timestamp = Date.now();
 
-          for (let i = 0; i < data.data.length; i++) {
-            if (data.data[i].b64_json) {
-              const buffer = Buffer.from(data.data[i].b64_json, 'base64');
-              const fileName = `openai_generated_image_${timestamp}_${i + 1}.png`;
-              const filePath = join(tmpdir(), fileName);
-              writeFileSync(filePath, buffer);
-              filePaths.push(filePath);
+          if (response.data) {
+            for (let i = 0; i < response.data.length; i++) {
+              const imageData = response.data[i];
+              if (imageData.b64_json) {
+                const buffer = Buffer.from(imageData.b64_json, 'base64');
+                const fileName = `openai_generated_image_${timestamp}_${i + 1}.png`;
+                const filePath = join(tmpdir(), fileName);
+                writeFileSync(filePath, buffer);
+                filePaths.push(filePath);
+              }
             }
           }
 
