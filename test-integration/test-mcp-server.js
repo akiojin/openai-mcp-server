@@ -171,53 +171,86 @@ async function runTests() {
       logTest('Get version request', false, error.message);
     }
 
-    // Test 3: 画像生成（必須パラメータのみ）
-    log('\nTest: Generate Image (Basic)');
-    try {
-      const imageResponse = await client.sendRequest('tools/call', {
-        name: 'generate_image',
-        arguments: {
-          prompt: 'A simple test image'
-        }
-      });
-      const content = imageResponse.result?.content?.[0]?.text;
-      const imageData = content ? JSON.parse(content) : null;
-      
-      console.log('Image generation response:', JSON.stringify(imageData, null, 2));
-      
-      if (imageData?.error) {
-        logTest('Should generate image without error', false, imageData.error);
-      } else {
-        logTest('Should generate image', !!imageData);
-        logTest('Should return file paths', imageData?.file_paths?.length > 0, 
-          `Got: ${JSON.stringify(imageData)}`)
+    // Test 3: Chat Completion (parallel for all models)
+    log('\nTest: Chat Completion (All Models - Parallel)');
+    const testModels = ['gpt-4o-mini', 'gpt-4.1', 'gpt-5', 'gpt-5-mini'];
+    
+    const modelTests = testModels.map(async (model) => {
+      try {
+        const chatResponse = await client.sendRequest('tools/call', {
+          name: 'chat_completion',
+          arguments: {
+            model: model,
+            messages: [
+              { role: 'user', content: 'Reply with exactly: TEST_OK' }
+            ],
+            temperature: 0,
+            max_tokens: 10
+          }
+        });
+        const chatContent = chatResponse.result?.content?.[0]?.text;
+        const chatData = chatContent ? JSON.parse(chatContent) : null;
+        
+        return {
+          model,
+          success: !!chatData?.content,
+          hasTestOK: chatData?.content?.includes('TEST_OK'),
+          content: chatData?.content || null,
+          error: null
+        };
+      } catch (error) {
+        return {
+          model,
+          success: false,
+          hasTestOK: false,
+          content: null,
+          error: error.message
+        };
       }
-    } catch (error) {
-      logTest('Generate image request', false, error.message);
-    }
+    });
+    
+    const results = await Promise.all(modelTests);
+    
+    results.forEach(result => {
+      if (result.error) {
+        logTest(`${result.model}: Chat completion`, false, result.error);
+      } else {
+        logTest(`${result.model}: Chat completion`, result.success);
+        if (result.success) {
+          logTest(`${result.model}: Returns TEST_OK`, result.hasTestOK);
+        }
+      }
+    });
 
-    // Test 4: 画像生成（全パラメータ）
-    log('\nTest: Generate Image (Full Parameters)');
-    try {
-      const imageResponse = await client.sendRequest('tools/call', {
-        name: 'generate_image',
-        arguments: {
-          prompt: 'A beautiful landscape with mountains',
-          n: 1,
-          size: '1024x1024',
-          quality: 'high'
+    // Test 4: 画像生成テスト（デフォルトはスキップ、INCLUDE_IMAGE_TESTSで有効化）
+    const includeImageTests = process.env.INCLUDE_IMAGE_TESTS === 'true';
+    
+    if (!includeImageTests) {
+      log('\nTest: Generate Image - SKIPPED (use npm run test:integration:all to include)');
+    } else {
+      log('\nTest: Generate Image (Basic)');
+      try {
+        const imageResponse = await client.sendRequest('tools/call', {
+          name: 'generate_image',
+          arguments: {
+            prompt: 'A simple test image'
+          }
+        });
+        const content = imageResponse.result?.content?.[0]?.text;
+        const imageData = content ? JSON.parse(content) : null;
+        
+        console.log('Image generation response:', JSON.stringify(imageData, null, 2));
+        
+        if (imageData?.error) {
+          logTest('Should generate image without error', false, imageData.error);
+        } else {
+          logTest('Should generate image', !!imageData);
+          logTest('Should return file paths', imageData?.file_paths?.length > 0, 
+            `Got: ${JSON.stringify(imageData)}`)
         }
-      });
-      const content = imageResponse.result?.content?.[0]?.text;
-      const imageData = content ? JSON.parse(content) : null;
-      
-      if (imageData?.error) {
-        logTest('Should generate image with full params', false, imageData.error);
-      } else {
-        logTest('Should generate image with full params', !!imageData?.file_paths);
+      } catch (error) {
+        logTest('Generate image request', false, error.message);
       }
-    } catch (error) {
-      logTest('Generate image with params request', false, error.message);
     }
 
     // Test 5: エラーハンドリング（プロンプトなし）

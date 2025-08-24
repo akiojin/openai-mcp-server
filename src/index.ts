@@ -146,7 +146,12 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
       case 'chat_completion': {
         if (!args?.messages || !Array.isArray(args.messages)) {
           return {
-            error: { code: 'INVALID_ARGUMENTS', message: 'messages array is required' },
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({ error: 'messages array is required' }),
+              },
+            ],
           };
         }
 
