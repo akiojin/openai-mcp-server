@@ -80,8 +80,16 @@ Parameters:
 - `model` (string, optional): Model to use (default: "gpt-4.1")
 - `messages` (array, required): Chat history with role and content
 - `temperature` (number, optional): Sampling temperature 0-2 (default: 0.7)
-- `max_tokens` (number, optional): Maximum tokens to generate (default: 1000)
-  - **Note**: GPT-5 models require minimum 200 tokens due to their reasoning capabilities
+  - **Note**: GPT-5 models only support temperature=1
+- `max_tokens` (number, optional): Maximum tokens to generate
+  - For GPT-4 models: defaults to 1000
+  - For GPT-5 models: optional - if not specified, model automatically allocates necessary tokens
+- `reasoning_effort` (string, optional): **GPT-5 only** - Controls reasoning depth
+  - `minimal`: Fast responses, no reasoning tokens
+  - `low`: Light reasoning
+  - `medium`: Standard reasoning (default)
+  - `high`: Deep reasoning for complex analysis
+- `verbosity` (string, optional): **GPT-5 only** - Response length (low/medium/high)
 
 #### list_models
 

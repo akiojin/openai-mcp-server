@@ -41,8 +41,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'chat_completion',
-      description:
-        'Generate text responses using OpenAI ChatGPT models. Note: GPT-5 models require significantly more tokens (minimum 200) due to their reasoning capabilities.',
+      description: `Generate text responses using OpenAI ChatGPT models.
+      
+GPT-5 IMPORTANT NOTES:
+- max_tokens is OPTIONAL for GPT-5 - if not specified, model automatically allocates necessary tokens
+- reasoning_effort is OPTIONAL - defaults to "medium" if not specified
+- For simple/fast responses: use reasoning_effort="minimal"
+- For deep analysis: use reasoning_effort="high"
+- The model automatically balances tokens between reasoning and output`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -70,8 +76,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           max_tokens: {
             type: 'number',
-            description: 'Maximum tokens to generate (GPT-5 models require minimum 200)',
-            default: 1000,
+            description:
+              'Maximum tokens to generate. For GPT-5: Optional - if not specified, model automatically allocates necessary tokens',
+          },
+          reasoning_effort: {
+            type: 'string',
+            enum: ['minimal', 'low', 'medium', 'high'],
+            description: `GPT-5 ONLY - Controls reasoning depth (Optional):
+- minimal: No reasoning tokens, fastest response, use for simple tasks/formatting
+- low: Light reasoning, balanced for moderate complexity
+- medium: Standard reasoning (default), good for analytical tasks
+- high: Deep reasoning, best quality but slower
+If not specified, GPT-5 uses its default (medium). The model automatically allocates tokens between reasoning and output.`,
+          },
+          verbosity: {
+            type: 'string',
+            enum: ['low', 'medium', 'high'],
+            description:
+              'GPT-5 ONLY - Response length (low=concise, medium=balanced, high=detailed)',
           },
         },
         required: ['messages'],
@@ -167,9 +189,22 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         };
 
         if (isGPT5Model) {
-          completionParams.max_completion_tokens = (args.max_tokens as number) ?? 1000;
+          // GPT-5: max_completion_tokensはオプション（指定された場合のみ設定）
+          if (args.max_tokens) {
+            completionParams.max_completion_tokens = args.max_tokens as number;
+          }
           // GPT-5はtemperature=1のみサポート（0や他の値は400エラー）
           // GPT-5にはtemperatureを設定しない（デフォルトの1を使用）
+
+          // reasoning_effortパラメータ（オプション）
+          if (args.reasoning_effort) {
+            completionParams.reasoning_effort = args.reasoning_effort as string;
+          }
+
+          // verbosityパラメータ（オプション）
+          if (args.verbosity) {
+            completionParams.verbosity = args.verbosity as string;
+          }
         } else {
           completionParams.max_tokens = (args.max_tokens as number) ?? 1000;
           completionParams.temperature = temperature;
