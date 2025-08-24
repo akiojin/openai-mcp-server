@@ -41,7 +41,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'chat_completion',
-      description: 'Generate text responses using OpenAI ChatGPT models',
+      description:
+        'Generate text responses using OpenAI ChatGPT models. Note: GPT-5 models require significantly more tokens (minimum 200) due to their reasoning capabilities.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -69,7 +70,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           max_tokens: {
             type: 'number',
-            description: 'Maximum tokens to generate',
+            description: 'Maximum tokens to generate (GPT-5 models require minimum 200)',
             default: 1000,
           },
         },
@@ -158,17 +159,20 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         const modelName = (args.model as string) || 'gpt-4.1';
         const isGPT5Model = modelName.startsWith('gpt-5');
 
-        // GPT-5モデルはmax_completion_tokensを使用
+        // GPT-5モデルはmax_completion_tokensを使用し、temperatureは1のみサポート
+        const temperature = (args.temperature as number) ?? 0.7;
         const completionParams: any = {
           model: modelName,
           messages: args.messages as any[],
-          temperature: (args.temperature as number) ?? 0.7,
         };
 
         if (isGPT5Model) {
           completionParams.max_completion_tokens = (args.max_tokens as number) ?? 1000;
+          // GPT-5はtemperature=1のみサポート（0や他の値は400エラー）
+          // GPT-5にはtemperatureを設定しない（デフォルトの1を使用）
         } else {
           completionParams.max_tokens = (args.max_tokens as number) ?? 1000;
+          completionParams.temperature = temperature;
         }
 
         const completion = await openai.chat.completions.create(completionParams);

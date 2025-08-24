@@ -81,6 +81,7 @@ Parameters:
 - `messages` (array, required): Chat history with role and content
 - `temperature` (number, optional): Sampling temperature 0-2 (default: 0.7)
 - `max_tokens` (number, optional): Maximum tokens to generate (default: 1000)
+  - **Note**: GPT-5 models require minimum 200 tokens due to their reasoning capabilities
 
 #### list_models
 

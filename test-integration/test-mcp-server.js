@@ -177,6 +177,9 @@ async function runTests() {
     
     const modelTests = testModels.map(async (model) => {
       try {
+        // GPT-5系モデルはより多くのトークンが必要
+        const maxTokens = model.startsWith('gpt-5') ? 200 : 10;
+        
         const chatResponse = await client.sendRequest('tools/call', {
           name: 'chat_completion',
           arguments: {
@@ -185,7 +188,7 @@ async function runTests() {
               { role: 'user', content: 'Reply with exactly: TEST_OK' }
             ],
             temperature: 0,
-            max_tokens: 10
+            max_tokens: maxTokens
           }
         });
         const chatContent = chatResponse.result?.content?.[0]?.text;
