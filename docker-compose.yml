@@ -1,0 +1,37 @@
+services:
+  openai-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openai-mcp-server
+    volumes:
+      - .:/openai-mcp-server
+      - bash-history:/root/.bash_history_dir
+      - claude_config:/root/.claude
+      - ~/.codex:/root/.codex
+    environment:
+      # Claude Code用の環境変数
+      - ANTHROPIC_API_KEY
+      - ENABLE_BACKGROUND_TASKS=1
+      - FORCE_AUTO_BACKGROUND_TASKS=1
+      - MAX_MCP_OUTPUT_TOKENS
+      - OPENAI_API_KEY
+      - GOOGLE_API_KEY
+      # GitHub統合用
+      - GITHUB_TOKEN
+      - GITHUB_USERNAME
+      - GITHUB_PERSONAL_ACCESS_TOKEN
+      - GIT_USER_EMAIL
+      # bash_history
+      - HISTFILE=/root/.bash_history_dir/.bash_history
+      - HISTSIZE=5000
+      - HISTFILESIZE=200000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stdin_open: true
+    tty: true
+    working_dir: /openai-mcp-server
+
+volumes:
+  bash-history: {}
+  claude_config: {}

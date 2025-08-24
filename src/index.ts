@@ -150,12 +150,23 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           };
         }
 
-        const completion = await openai.chat.completions.create({
-          model: (args.model as string) || 'gpt-4.1',
+        const modelName = (args.model as string) || 'gpt-4.1';
+        const isGPT5Model = modelName.startsWith('gpt-5');
+
+        // GPT-5モデルはmax_completion_tokensを使用
+        const completionParams: any = {
+          model: modelName,
           messages: args.messages as any[],
           temperature: (args.temperature as number) ?? 0.7,
-          max_tokens: (args.max_tokens as number) ?? 1000,
-        });
+        };
+
+        if (isGPT5Model) {
+          completionParams.max_completion_tokens = (args.max_tokens as number) ?? 1000;
+        } else {
+          completionParams.max_tokens = (args.max_tokens as number) ?? 1000;
+        }
+
+        const completion = await openai.chat.completions.create(completionParams);
 
         return {
           content: [
