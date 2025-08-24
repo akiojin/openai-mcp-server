@@ -10,6 +10,8 @@ services:
       - claude_config:/root/.claude
       - ~/.codex:/root/.codex
     environment:
+      - NPM_USER
+      - NPM_EMAIL
       # Claude Code用の環境変数
       - ANTHROPIC_API_KEY
       - ENABLE_BACKGROUND_TASKS=1
