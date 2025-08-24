@@ -1,6 +1,6 @@
 {
   "name": "@akiojin/openai-mcp-server",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "OpenAI API MCP Server - MCPサーバー経由でOpenAI APIを呼び出す",
   "main": "dist/index.js",
   "type": "module",
