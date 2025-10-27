@@ -47,7 +47,7 @@ jobs:
         branches-badge-filename: branches.svg
     
     - name: Upload coverage reports as artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: coverage-report
         path: coverage/
